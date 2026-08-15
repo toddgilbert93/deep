@@ -79,6 +79,13 @@ directory without changing the lockfile.
 - `.env.local` — optional untracked local secrets; cleanup: `rm -f .env.local`
 - `backend/.cache/webpage-assets/` — image URL cache; cleanup: `rm -rf backend/.cache/webpage-assets`
 - `backend/storage/webpage-assets/` — persistent downloaded image assets and metadata; cleanup only when the assets are no longer needed: `rm -rf backend/storage/webpage-assets`
+- `/tmp/deep-parse.json` — optional manual parser output; cleanup: `rm -f /tmp/deep-parse.json`
+- `/tmp/deep-reconstruction.json` — optional final reconstruction output; cleanup: `rm -f /tmp/deep-reconstruction.json`
+- `/tmp/deep-reconstruction-events.ndjson` — optional reconstruction event stream; cleanup: `rm -f /tmp/deep-reconstruction-events.ndjson`
+
+The reconstruction workflow and event contract use existing project packages;
+they add no machine-level tool or npm dependency beyond the AJV validator
+already listed above.
 
 ## External services
 
@@ -98,6 +105,7 @@ Run from the repository root:
 
 ```sh
 rm -rf node_modules .next
+rm -f /tmp/deep-parse.json /tmp/deep-reconstruction.json /tmp/deep-reconstruction-events.ndjson
 ```
 
 This leaves source files, package.json, and package-lock.json intact.

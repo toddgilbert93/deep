@@ -12,6 +12,7 @@
     "grok:models": "tsx backend/scripts/list-grok-models.ts",
     "webpage:pull": "tsx backend/scripts/pull-webpage.ts",
     "webpage:parse": "tsx backend/scripts/parse-webpage.ts",
+    "webpage:reconstruct": "tsx backend/scripts/reconstruct-webpage.ts",
     "reconstruction:schema": "tsx backend/scripts/print-reconstruction-schema.ts"
   },
   "dependencies": {

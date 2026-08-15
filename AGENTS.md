@@ -72,7 +72,10 @@ Implemented:
   and `assetId` links from parsed image elements.
 - Versioned, strict `ReconstructionSpec` JSON Schema with source-reference,
   hierarchy, coverage, interaction, and local-asset validation.
-- Mocked provider, parser, network-safety, and image-cache tests.
+- Single-agent URL-to-`ReconstructionSpec` workflow with ordered progress,
+  source-element, reconstructed-node, completion, and failure events.
+- Mocked provider, parser, network-safety, image-cache, reconstruction, and
+  workflow-event tests.
 
 Not implemented yet:
 
@@ -80,6 +83,47 @@ Not implemented yet:
 - Parallel reconstruction agents, final planning, and code generation.
 - Final request/response schemas from the teammate-owned backend contract.
 - Production deployment or shared remote asset storage.
+
+## UI/UX partner handoff
+
+The partner agent is currently focused on the user-facing conversion
+experience in `src/app/`. Its immediate goal is to implement Phase 1 and design
+the frontend state model so Phases 2 and 3 can be added without replacing it.
+
+UI/UX agent responsibilities:
+
+- Own the URL submission experience, loading/progress presentation, conversion
+  status UI, streamed reconstruction preview, error states, retry behavior,
+  responsive layout, and accessibility.
+- Build a reducer or equivalent state layer around the event union documented
+  below. Keep it independent from the eventual SSE/WebSocket/fetch transport.
+- Use `stage` for status selection, `progress` for the loading indicator,
+  `sequence` for ordering, and stable IDs for element/node upserts.
+- Design Phase 3 overlays around `focus.highlightColor` and `annotation` rather
+  than deriving highlights from model text.
+- Use deterministic mock event fixtures while the public streaming endpoint is
+  absent. Fixtures should cover success, failure, duplicate or out-of-order
+  events, reconnection, an empty image set, and a long-running model stage.
+- Keep frontend-only implementation in `src/`; do not import Node-only backend
+  modules into client components. Shared wire types should eventually be
+  generated from or synchronized with `openapi.yaml`.
+- Read `src/app/3DUI/instructions.md` before using or changing the approved 3D
+  component library.
+
+Backend agent responsibilities:
+
+- Own collection, parsing, local asset persistence, model calls, validation,
+  orchestration, event production, and the future streaming HTTP transport.
+- Preserve the event semantics in
+  `backend/src/workflow/reconstruction-events.ts` and notify the UI owner before
+  making a breaking event change.
+- Add the agreed public streaming endpoint to `openapi.yaml` before either side
+  hardcodes its route, request body, or transport details.
+
+Current integration limitation: `webpage:reconstruct` proves the full workflow
+and emits the frontend event objects, but there is not yet a browser-accessible
+backend endpoint. The UI agent should build against mocked events and an
+injectable event-source adapter, not invoke the backend CLI from the browser.
 
 ## Repository map
 
@@ -94,6 +138,10 @@ Not implemented yet:
   of HTML/JavaScript into the compact UI graph sent to evaluation agents.
 - `backend/src/assets/` — local content-addressed image storage. Parsed image
   elements link to stored files through `assetId`.
+- `backend/src/agents/` — structured reconstruction-agent prompts and validated
+  model-output handling.
+- `backend/src/workflow/` — URL-to-reconstruction orchestration and the stable
+  frontend event contract.
 - `backend/scripts/` — local smoke checks and webpage pull/parse commands.
 - `backend/tests/` — backend unit and integration tests plus deterministic
   fixtures.
@@ -160,6 +208,57 @@ The reconstruction planner must read the actual component prop types and
 `src/app/3DUI/instructions.md`; this table is routing guidance, not permission
 to invent unsupported props.
 
+## Frontend/backend workflow event contract
+
+The canonical TypeScript event definitions are in
+`backend/src/workflow/reconstruction-events.ts`. UI-building agents must use
+that discriminated union as the behavioral contract until equivalent schemas
+are merged into `openapi.yaml`. Do not invent an endpoint or transport while
+the public HTTP contract remains undecided; adapt the agreed SSE, WebSocket, or
+streaming-fetch transport to these events when it is added.
+
+Every event contains:
+
+- `eventVersion`, currently `"1.0"`.
+- `jobId`, identifying one conversion.
+- A monotonically increasing `sequence`, used for ordering and deduplication.
+- `emittedAt`, `stage`, and integer `progress` from 0 through 100.
+- A discriminating `type` with type-specific data.
+
+Event types and UI behavior:
+
+- `workflow.status` — update the loading bar from `progress` and select UI copy
+  from `stage`. The supplied `message` is displayable context, but the UI must
+  never parse it to determine state.
+- `source.element` — optionally visualize the parsed source element, draw the
+  green highlight from `focus.highlightColor`, and place `annotation` beside
+  it. Use the IDs in `focus` for attachment, never text matching.
+- `reconstruction.node` — add or replace the node by `node.id`, associate it
+  with `focus.sourceElementIds`, highlight it, and show its annotation. Treat
+  the node as a complete idempotent snapshot, not executable source code.
+- `workflow.completed` — treat as the only successful terminal event. Replace
+  incremental state with the validated `result` specification and set progress
+  to 100.
+- `workflow.failed` — stop the loading state, present a safe error using
+  `error.code`, and offer retry only when `error.retryable` is true.
+
+The frontend event reducer must:
+
+1. Keep state isolated by `jobId`.
+2. Ignore duplicate events and any event whose `sequence` is not newer than the
+   last applied sequence for that job.
+3. Upsert elements and nodes by their stable IDs so replay is safe.
+4. Treat `workflow.completed` and `workflow.failed` as terminal.
+5. Never render raw model text, chain-of-thought, unvalidated JSON, or arbitrary
+   executable HTML/React received over the event stream.
+6. Preserve the last valid state if the stream disconnects. A future resumable
+   transport should reconnect using the job ID and last applied sequence.
+
+The current backend runner emits source-element and reconstruction-node events
+after each corresponding validated batch becomes available. Future token- or
+tool-streaming may make these events arrive earlier, but it must retain the same
+event version, ordering, ID, validation, and terminal-state guarantees.
+
 ## Common commands
 
 Install exact dependencies:
@@ -192,6 +291,13 @@ Parse an explicitly trusted local development page:
 
 ```sh
 npm run webpage:parse -- http://127.0.0.1:3000 --allow-private
+```
+
+Run a billable local end-to-end reconstruction. Structured progress events are
+written as NDJSON to stderr and the final validated spec is written to stdout:
+
+```sh
+npm run --silent webpage:reconstruct -- http://127.0.0.1:3000 --allow-private
 ```
 
 Test the configured Grok connection; this makes a billable request:

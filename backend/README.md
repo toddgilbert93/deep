@@ -118,6 +118,28 @@ Before accepting an agent response, call `validateReconstructionSpec` with the
 source graph's element, connection, and image-asset IDs. This adds cross-reference,
 coverage, hierarchy, and duplicate-ID checks that JSON Schema cannot express.
 
+## Reconstruction workflow and events
+
+`src/workflow/reconstruct-webpage.ts` connects webpage collection, parsing,
+local image caching, the Grok reconstruction agent, and strict result
+validation. It emits the versioned event union in
+`src/workflow/reconstruction-events.ts`; an HTTP streaming transport should
+forward these events without converting them into log strings.
+
+Run the complete workflow against an explicitly trusted local page. This makes
+a billable xAI request:
+
+```sh
+npm run --silent webpage:reconstruct -- http://127.0.0.1:3000 --allow-private \
+  > /tmp/deep-reconstruction.json \
+  2> /tmp/deep-reconstruction-events.ndjson
+```
+
+The final validated `ReconstructionSpec` is written to stdout. Ordered progress
+events are written as newline-delimited JSON to stderr. The production frontend
+must consume these event objects through the future agreed streaming API, not
+by invoking or scraping the CLI.
+
 ## Planned reconstruction responsibility
 
 The expected high-level flow is:
