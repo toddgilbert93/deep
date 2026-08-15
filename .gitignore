@@ -20,6 +20,10 @@
 # production
 /build
 
+# backend runtime data
+/backend/.cache/
+/backend/storage/
+
 # misc
 .DS_Store
 *.pem

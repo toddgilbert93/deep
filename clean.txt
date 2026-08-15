@@ -24,6 +24,9 @@ proposed removals; Homebrew dependencies may be shared with other software.
 
 Runtime dependencies declared in package.json:
 
+- acorn ^8.18.0 — parses first-party JavaScript into an AST without executing it
+- acorn-walk ^8.3.5 — traverses JavaScript ASTs for UI relationships
+- cheerio ^1.2.0 — parses fetched HTML without executing JavaScript
 - next 16.3.1
 - react 19.2.8
 - react-dom 19.2.8
@@ -46,6 +49,18 @@ To remove only the backend TypeScript runner:
 npm uninstall --save-dev tsx
 ```
 
+To remove only the browser-free HTML parser:
+
+```sh
+npm uninstall cheerio
+```
+
+To remove only the JavaScript static-analysis parser:
+
+```sh
+npm uninstall acorn acorn-walk
+```
+
 All transitive npm packages and their exact versions are tracked in
 package-lock.json. `npm ci` installs them into the generated `node_modules/`
 directory without changing the lockfile.
@@ -55,6 +70,8 @@ directory without changing the lockfile.
 - `node_modules/` — created by `npm ci`; cleanup: `rm -rf node_modules`
 - `.next/` — created by Next.js development/build commands; cleanup: `rm -rf .next`
 - `.env.local` — optional untracked local secrets; cleanup: `rm -f .env.local`
+- `backend/.cache/webpage-assets/` — image URL cache; cleanup: `rm -rf backend/.cache/webpage-assets`
+- `backend/storage/webpage-assets/` — persistent downloaded image assets and metadata; cleanup only when the assets are no longer needed: `rm -rf backend/storage/webpage-assets`
 
 ## External services
 

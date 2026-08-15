@@ -5,7 +5,30 @@
 Deep evaluates a webpage from a submitted URL. The planned backend will run
 multiple Grok-powered agents concurrently, identify UI elements, describe UX
 connections between them, and combine those findings into a stable API
-response. This workflow is planned but not implemented yet.
+response.
+
+## Current implementation status
+
+Implemented:
+
+- Next.js frontend scaffold.
+- Grok/xAI Responses API provider with configurable `XAI_MODEL`.
+- Browser-free HTML and JavaScript source collection with redirect, byte, and
+  private-network protections.
+- Deterministic conversion of webpage source into a compact UI-element and
+  UX-connection graph.
+- Static analysis of bounded first-party JavaScript for event listeners and
+  fetch effects; JavaScript is downloaded but never executed.
+- Local-only image download, SHA-256 content-addressed persistence, URL cache,
+  and `assetId` links from parsed image elements.
+- Mocked provider, parser, network-safety, and image-cache tests.
+
+Not implemented yet:
+
+- Public backend HTTP endpoints.
+- Parallel evaluation agents and final aggregation.
+- Final request/response schemas from the teammate-owned backend contract.
+- Production deployment or shared remote asset storage.
 
 ## Repository map
 
@@ -13,6 +36,17 @@ response. This workflow is planned but not implemented yet.
 - `public/` — frontend static assets.
 - `backend/` — all backend source code, tests, prompts, and backend-specific
   configuration. Read `backend/README.md` before adding backend code.
+- `backend/src/webpage/` — safe source collection and deterministic conversion
+  of HTML/JavaScript into the compact UI graph sent to evaluation agents.
+- `backend/src/assets/` — local content-addressed image storage. Parsed image
+  elements link to stored files through `assetId`.
+- `backend/scripts/` — local smoke checks and webpage pull/parse commands.
+- `backend/tests/` — backend unit and integration tests plus deterministic
+  fixtures.
+- `backend/storage/webpage-assets/` — generated local persistent images and
+  metadata. This directory is ignored by Git.
+- `backend/.cache/webpage-assets/` — generated local URL cache. This directory
+  is ignored by Git.
 - `openapi.yaml` — canonical frontend/backend API contract. Update this file
   before implementing a contract change.
 - `clean.txt` — dependency and generated-artifact cleanup ledger. Record every
@@ -30,8 +64,93 @@ response. This workflow is planned but not implemented yet.
 - Keep model-provider calls behind `backend/src/providers/` so workflow logic
   is not coupled directly to Grok/xAI transport details.
 - Prefer structured, schema-validated agent outputs over free-form text.
+- Asset storage is intentionally local filesystem storage. Do not introduce
+  cloud storage or a database without an explicit project decision.
+- Never enable `--allow-private` for an untrusted or user-submitted URL.
+- Do not send raw HTML or framework JavaScript to Grok. Send the compact UI
+  graph produced by `webpage:parse`.
 - Update this guide whenever the project layout or architectural boundaries
   change.
+
+## Common commands
+
+Install exact dependencies:
+
+```sh
+npm ci
+```
+
+Run the frontend:
+
+```sh
+npm run dev
+```
+
+Run all backend tests and project checks:
+
+```sh
+npm run backend:test
+npx tsc --noEmit
+npm run lint
+```
+
+Parse a public page into the compact graph and cache its images locally:
+
+```sh
+npm run webpage:parse -- https://example.com
+```
+
+Parse an explicitly trusted local development page:
+
+```sh
+npm run webpage:parse -- http://127.0.0.1:3000 --allow-private
+```
+
+Test the configured Grok connection; this makes a billable request:
+
+```sh
+npm run grok:check
+```
+
+## Local generated data
+
+- Git shares source code, tests, documentation, dependency manifests, and the
+  OpenAPI contract.
+- Git does not share downloaded webpage images, asset metadata, URL caches,
+  `.env` files, API keys, `node_modules/`, or `.next/` output.
+- Each teammate regenerates local webpage assets by running `webpage:parse`.
+- The graph's `assetId`, `storageKey`, and `metadataKey` link an image element
+  to files under that teammate's local `backend/storage/webpage-assets/`.
+- See `clean.txt` before removing generated data or installed tools.
+
+## Collaboration workflow
+
+Before starting work:
+
+```sh
+git switch main
+git pull --rebase origin main
+npm ci
+```
+
+Before sharing work:
+
+```sh
+npm run backend:test
+npx tsc --noEmit
+npm run lint
+git status
+git add .
+git diff --staged
+git commit -m "describe the change"
+git pull --rebase origin main
+git push origin main
+```
+
+- Review staged changes and confirm no secret or generated runtime data is
+  included.
+- Resolve rebase conflicts carefully; do not use force-push on shared `main`.
+- Preserve a teammate's unrelated changes when working in a dirty tree.
 
 ## API contract workflow
 

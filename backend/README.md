@@ -43,6 +43,60 @@ Run an explicit live smoke check, which does make a billable API request:
 npm run grok:check
 ```
 
+## Browser-free webpage source collection
+
+`src/webpage/fetch-webpage-source.ts` downloads server-returned HTML, parses it
+with Cheerio, and downloads inline and referenced JavaScript without executing
+it. Private and reserved network destinations are blocked by default.
+
+To inspect a public page:
+
+```sh
+npm run webpage:pull -- https://example.com
+```
+
+For an explicitly trusted local development page only:
+
+```sh
+npm run webpage:pull -- http://127.0.0.1:3000 --allow-private
+```
+
+The local-network override must never be enabled for user-submitted production
+URLs.
+
+Convert the fetched source into the compact UI graph intended for model input:
+
+```sh
+npm run webpage:parse -- https://example.com
+```
+
+For an explicitly trusted local page:
+
+```sh
+npm run webpage:parse -- http://127.0.0.1:3000 --allow-private
+```
+
+The parser keeps semantic and interactive DOM elements, accessible names,
+state, hierarchy, navigation, form, label, and ARIA relationships. It ignores
+known framework bundles and statically inspects bounded first-party JavaScript
+for event listeners and fetch effects. It never executes the JavaScript.
+
+Image elements are downloaded during `webpage:parse`, stored by SHA-256 under
+`backend/storage/webpage-assets/images/`, and linked to their UI elements with
+`assetId`. Durable metadata sidecars are stored beside the image collection,
+while `backend/.cache/webpage-assets/url-index.json` avoids downloading the
+same source URL again. Both directories are excluded from Git.
+
+Override the local storage locations when needed:
+
+```sh
+export WEBPAGE_ASSET_STORAGE_DIR="/durable/path/webpage-assets"
+export WEBPAGE_ASSET_CACHE_DIR="/cache/path/webpage-assets"
+```
+
+The project currently supports local filesystem asset storage only. Do not add
+cloud or database-backed storage without an explicit project decision.
+
 ## Planned responsibility
 
 The expected high-level flow is:

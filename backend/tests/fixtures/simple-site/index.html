@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Local Parser Fixture</title>
+  </head>
+  <body>
+    <nav aria-label="Primary navigation">
+      <a href="/documentation">Documentation</a>
+    </nav>
+    <main>
+      <h1>Evaluate this page</h1>
+      <img
+        id="product-preview"
+        src="/product.png"
+        alt="Product preview"
+        width="1"
+        height="1"
+      />
+      <form id="evaluation-form" action="/api/evaluations" method="post">
+        <label for="page-url">Webpage URL</label>
+        <input
+          id="page-url"
+          name="url"
+          type="url"
+          placeholder="https://example.com"
+          required
+        />
+        <button
+          id="evaluate-button"
+          type="submit"
+          aria-controls="evaluation-results"
+        >
+          Evaluate
+        </button>
+      </form>
+      <section id="evaluation-results" aria-label="Evaluation results">
+        Results appear here.
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+    <script>
+      window.fixtureLoaded = true;
+    </script>
+    <script type="application/ld+json">
+      {"name":"metadata, not executable JavaScript"}
+    </script>
+  </body>
+</html>
