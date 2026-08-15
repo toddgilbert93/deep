@@ -1,0 +1,88 @@
+# Dependency and cleanup ledger
+
+Last updated: 2026-08-15
+
+This file tracks tools, dependencies, and generated artifacts used by this
+project. Update it whenever a new dependency or external service is added.
+
+## Machine-level tools
+
+### Node.js and npm
+
+- Required by: Next.js development and build scripts
+- Required Node.js version: >=20.9.0
+- Installation method: Homebrew (`brew install node`)
+- npm is bundled with the Homebrew Node.js package; do not install npm separately.
+- Installed versions observed on 2026-08-15: Node.js 26.7.0, npm 11.19.0
+- Installed by: user/environment (not installed by Codex)
+- Cleanup: `brew uninstall node`
+
+Do not run `brew autoremove` as part of project cleanup without reviewing its
+proposed removals; Homebrew dependencies may be shared with other software.
+
+## Direct project packages
+
+Runtime dependencies declared in package.json:
+
+- next 16.3.1
+- react 19.2.8
+- react-dom 19.2.8
+
+Development dependencies declared in package.json:
+
+- @tailwindcss/postcss ^4
+- @types/node ^20
+- @types/react ^19
+- @types/react-dom ^19
+- eslint ^9
+- eslint-config-next 16.3.1
+- tailwindcss ^4
+- tsx ^4.23.12 — runs backend TypeScript scripts and tests
+- typescript ^5
+
+To remove only the backend TypeScript runner:
+
+```sh
+npm uninstall --save-dev tsx
+```
+
+All transitive npm packages and their exact versions are tracked in
+package-lock.json. `npm ci` installs them into the generated `node_modules/`
+directory without changing the lockfile.
+
+## Generated local artifacts
+
+- `node_modules/` — created by `npm ci`; cleanup: `rm -rf node_modules`
+- `.next/` — created by Next.js development/build commands; cleanup: `rm -rf .next`
+- `.env.local` — optional untracked local secrets; cleanup: `rm -f .env.local`
+
+## External services
+
+### xAI Responses API
+
+- Required by: `backend/src/providers/grok.ts`
+- API base URL: `https://api.x.ai/v1`
+- Local configuration: `XAI_API_KEY`, `XAI_MODEL`, and optional `XAI_BASE_URL`
+- Default model: `grok-4.6` (live connection verified 2026-08-15)
+- Local secret files are excluded by `.gitignore`.
+- Shell cleanup: `unset XAI_API_KEY XAI_MODEL XAI_BASE_URL`
+- File cleanup, if created: `rm -f .env.local`
+
+## Project-only cleanup
+
+Run from the repository root:
+
+```sh
+rm -rf node_modules .next
+```
+
+This leaves source files, package.json, and package-lock.json intact.
+
+## Full machine cleanup for today's setup
+
+After removing the project artifacts above, uninstall Node.js only if it was
+installed specifically for this project and is not needed elsewhere:
+
+```sh
+brew uninstall node
+```

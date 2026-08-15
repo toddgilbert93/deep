@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backend:test": "tsx --test backend/tests/grok.test.ts",
+    "grok:check": "tsx backend/scripts/check-grok.ts",
+    "grok:models": "tsx backend/scripts/list-grok-models.ts"
   },
   "dependencies": {
     "next": "16.3.1",
@@ -21,6 +24,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }

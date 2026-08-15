@@ -1,0 +1,9 @@
+openapi: 3.1.0
+info:
+  title: Deep Backend API
+  version: 0.0.0
+  description: >-
+    Canonical contract between the Deep frontend and backend. The initial file
+    is intentionally endpoint-free until the team imports and agrees on the
+    available backend contract.
+paths: {}
