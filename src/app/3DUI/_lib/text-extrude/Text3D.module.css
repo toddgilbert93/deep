@@ -1,0 +1,63 @@
+.root {
+  --ui3d-d: 18px;
+  --ui3d-steps: 17;
+  --ui3d-ink: #f5f5f5;
+  --ui3d-font: inherit;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui3d-ink);
+  font-family: var(--ui3d-font);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  perspective: 900px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  overflow: visible;
+}
+
+.slab {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  transform: rotateX(8deg) rotateY(-18deg);
+}
+
+.layer {
+  display: block;
+  color: color-mix(
+    in srgb,
+    var(--ui3d-ink) calc((1 - var(--ui3d-t, 0)) * 100%),
+    black
+  );
+  transform: translateZ(
+    calc(
+      var(--ui3d-d) / 2 - var(--layer, 0) * var(--ui3d-d) / var(--ui3d-steps)
+    )
+  );
+  text-rendering: geometricPrecision;
+}
+
+.layer:not(.front) {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.front {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slab {
+    animation: none;
+    transform: rotateX(8deg) rotateY(-18deg);
+  }
+}

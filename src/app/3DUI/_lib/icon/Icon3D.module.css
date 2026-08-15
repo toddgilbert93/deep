@@ -1,0 +1,129 @@
+.root {
+  --ui3d-w: 40px;
+  --ui3d-h: 40px;
+  --ui3d-d: 12px;
+  --ui3d-face: #f5f5f5;
+  display: inline-grid;
+  place-items: center;
+  width: calc(var(--ui3d-w) + var(--ui3d-d));
+  height: calc(var(--ui3d-h) + var(--ui3d-d));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  vertical-align: middle;
+  perspective: 480px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  overflow: visible;
+}
+
+.scene {
+  position: relative;
+  width: var(--ui3d-w);
+  height: var(--ui3d-h);
+  transform: rotateY(-16deg);
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
+.spin {
+  animation: ui3d-icon-spin 8s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.box {
+  --box-d: var(--ui3d-d);
+  --box-x: 0px;
+  --box-y: 0px;
+  --box-rz: 0deg;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--box-w);
+  height: var(--box-h);
+  margin-left: calc(var(--box-w) / -2);
+  margin-top: calc(var(--box-h) / -2);
+  transform: translate3d(var(--box-x), var(--box-y), 0) rotateZ(var(--box-rz));
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
+.face {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  backface-visibility: hidden;
+}
+
+.front,
+.back {
+  inset: 0;
+  width: var(--box-w);
+  height: var(--box-h);
+}
+
+.front {
+  background: var(--ui3d-face);
+  transform: translateZ(calc(var(--box-d) / 2));
+}
+
+.back {
+  background: color-mix(in srgb, var(--ui3d-face) 40%, black);
+  transform: rotateY(180deg) translateZ(calc(var(--box-d) / 2));
+}
+
+.right,
+.left {
+  top: 0;
+  left: 50%;
+  width: var(--box-d);
+  height: var(--box-h);
+  margin-left: calc(var(--box-d) / -2);
+}
+
+.right {
+  background: color-mix(in srgb, var(--ui3d-face) 55%, black);
+  transform: rotateY(90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.left {
+  background: color-mix(in srgb, var(--ui3d-face) 70%, white);
+  transform: rotateY(-90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.top,
+.bottom {
+  top: 50%;
+  left: 0;
+  width: var(--box-w);
+  height: var(--box-d);
+  margin-top: calc(var(--box-d) / -2);
+}
+
+.top {
+  background: color-mix(in srgb, var(--ui3d-face) 70%, white);
+  transform: rotateX(90deg) translateZ(calc(var(--box-h) / 2));
+}
+
+.bottom {
+  background: color-mix(in srgb, var(--ui3d-face) 55%, black);
+  transform: rotateX(-90deg) translateZ(calc(var(--box-h) / 2));
+}
+
+@keyframes ui3d-icon-spin {
+  from {
+    transform: rotateY(-16deg);
+  }
+
+  to {
+    transform: rotateY(16deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

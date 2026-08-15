@@ -1,0 +1,75 @@
+.root {
+  --ui3d-d: 28px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  perspective: 640px;
+  perspective-origin: 50% 42%;
+  transform-style: preserve-3d;
+}
+
+.well {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(var(--ui3d-d) * -1));
+}
+
+.tunnel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.wall {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  backface-visibility: hidden;
+}
+
+.top,
+.bottom {
+  left: 0;
+  width: 100%;
+  height: var(--ui3d-d);
+}
+
+.top {
+  top: 0;
+  transform-origin: 50% 0%;
+  transform: rotateX(-90deg);
+  background: #3f3f46;
+}
+
+.bottom {
+  bottom: 0;
+  transform-origin: 50% 100%;
+  transform: rotateX(90deg);
+  background: #09090b;
+}
+
+.left,
+.right {
+  top: 0;
+  width: var(--ui3d-d);
+  height: 100%;
+}
+
+.left {
+  left: 0;
+  transform-origin: 0% 50%;
+  transform: rotateY(90deg);
+  background: #27272a;
+}
+
+.right {
+  right: 0;
+  transform-origin: 100% 50%;
+  transform: rotateY(-90deg);
+  background: #18181b;
+}

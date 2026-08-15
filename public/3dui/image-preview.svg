@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Landscape preview">
+  <defs>
+    <linearGradient id="ui3d-img-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6aa8d8"/>
+      <stop offset="0.55" stop-color="#c5dff0"/>
+      <stop offset="1" stop-color="#e7f1dc"/>
+    </linearGradient>
+    <linearGradient id="ui3d-img-water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7eb7c9"/>
+      <stop offset="1" stop-color="#4e8aa0"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#ui3d-img-sky)"/>
+  <circle cx="246" cy="46" r="24" fill="#f3e3a2"/>
+  <path d="M0 118 58 86 96 108 148 62 198 98 248 74 320 104v36H0z" fill="#8aa08a"/>
+  <path d="M0 142 42 118 88 136 140 104 196 132 252 112 320 138v62H0z" fill="#5d7a58"/>
+  <path d="M0 164c38-18 72-10 108 4 34 14 70 8 108-8 36-16 72-10 104 6v34H0z" fill="url(#ui3d-img-water)"/>
+  <path d="M0 178 56 168 112 184 176 170 236 186 320 174v26H0z" fill="#3f5a3c"/>
+</svg>
