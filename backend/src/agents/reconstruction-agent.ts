@@ -45,6 +45,7 @@ Rules:
 - Use Image3D only with an assetId present in the input graph.
 - Prefer the approved 3DUI components. Use HtmlElement only for semantic layout, form fields, links, lists, and other behavior the 3DUI library does not provide.
 - Every source element must appear in at least one node.sourceElementIds entry or in unresolved with a concrete reason.
+- A structural wrapper with no independent content may be unresolved when its rendered purpose is already represented by mapped descendant elements.
 - Every claimed source element, connection, and asset ID must exist in the input.
 - Do not generate React, CSS, HTML source code, markdown, analysis, or model reasoning.`;
 
@@ -81,18 +82,70 @@ export async function createReconstructionSpec(
     );
   }
 
-  const validation = validateReconstructionSpec(candidate, {
+  const referenceContext = {
     elementIds: parsed.elements.map((element) => element.id),
     connectionIds: parsed.connections.map((connection) => connection.id),
     assetIds: parsed.assets.images.map((asset) => asset.id),
-    requireElementCoverage: true,
-  });
-  if (!validation.valid) {
+  };
+  const structuralValidation = validateReconstructionSpec(
+    candidate,
+    referenceContext,
+  );
+  if (!structuralValidation.valid) {
     throw new ReconstructionAgentOutputError(
       "Grok returned an invalid reconstruction specification.",
-      validation.errors,
+      structuralValidation.errors,
     );
   }
 
-  return { spec: validation.value, response };
+  accountForRepresentedStructuralWrappers(structuralValidation.value, parsed);
+  const coverageValidation = validateReconstructionSpec(
+    structuralValidation.value,
+    { ...referenceContext, requireElementCoverage: true },
+  );
+  if (!coverageValidation.valid) {
+    throw new ReconstructionAgentOutputError(
+      "Grok returned an invalid reconstruction specification.",
+      coverageValidation.errors,
+    );
+  }
+
+  return { spec: coverageValidation.value, response };
+}
+
+function accountForRepresentedStructuralWrappers(
+  spec: ReconstructionSpec,
+  parsed: ParsedWebpageUi,
+): void {
+  const accountedFor = new Set([
+    ...spec.nodes.flatMap((node) => node.sourceElementIds),
+    ...spec.unresolved.map((entry) => entry.sourceElementId),
+  ]);
+  const parentById = new Map(
+    parsed.elements.map((element) => [element.id, element.parentId] as const),
+  );
+  const ancestorsWithMappedDescendants = new Set<string>();
+
+  for (const mappedId of accountedFor) {
+    let parentId = parentById.get(mappedId);
+    while (parentId) {
+      ancestorsWithMappedDescendants.add(parentId);
+      parentId = parentById.get(parentId);
+    }
+  }
+
+  for (const element of parsed.elements) {
+    if (
+      element.kind !== "structure" ||
+      accountedFor.has(element.id) ||
+      !ancestorsWithMappedDescendants.has(element.id)
+    ) {
+      continue;
+    }
+    spec.unresolved.push({
+      sourceElementId: element.id,
+      reason:
+        "Structural wrapper is represented by mapped descendant elements.",
+    });
+  }
 }

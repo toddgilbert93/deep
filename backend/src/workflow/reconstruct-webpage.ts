@@ -9,7 +9,11 @@ import {
   ReconstructionAgentOutputError,
   type ReconstructionAgentClient,
 } from "../agents/reconstruction-agent";
-import { GrokApiError, GrokClient } from "../providers/grok";
+import {
+  GrokApiError,
+  GrokClient,
+  GrokConfigurationError,
+} from "../providers/grok";
 import type { ReconstructionSpec } from "../reconstruction/reconstruction-spec";
 import { cacheWebpageImages } from "../webpage/cache-webpage-images";
 import {
@@ -256,6 +260,13 @@ function classifyFailure(error: unknown): {
       code: "INVALID_RECONSTRUCTION",
       message: "The reconstruction result did not pass validation.",
       retryable: true,
+    };
+  }
+  if (error instanceof GrokConfigurationError) {
+    return {
+      code: "MODEL_CONFIGURATION_ERROR",
+      message: "The reconstruction model is not configured.",
+      retryable: false,
     };
   }
   if (error instanceof GrokApiError) {
