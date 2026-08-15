@@ -28,6 +28,8 @@ export function GoDeepForm() {
   const [error, setError] = useState<string | null>(null);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
 
+  const canSubmit = Boolean(normalizePageUrl(url));
+
   function startConversion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -82,10 +84,11 @@ export function GoDeepForm() {
       <Button3D
         type="submit"
         width={200}
-        disabled={!url.trim()}
+        disabled={!canSubmit}
         face="var(--accent)"
         ink="var(--ink-contrast)"
         fontFamily="var(--font-body)"
+        className="disabled:cursor-not-allowed disabled:opacity-25"
       >
         Go Deep
       </Button3D>
