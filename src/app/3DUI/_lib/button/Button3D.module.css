@@ -1,0 +1,194 @@
+.root {
+  --ui3d-w: 180px;
+  --ui3d-h: 56px;
+  --ui3d-d: 32px;
+  --ui3d-tilt-x: 12deg;
+  --ui3d-tilt-y: -18deg;
+  --ui3d-tilt-z: -4deg;
+  --ui3d-face: #f5f5f5;
+  --ui3d-ink: #111;
+  --ui3d-font: inherit;
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--ui3d-w) + var(--ui3d-h));
+  height: calc(var(--ui3d-w) + var(--ui3d-h));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  perspective: 900px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  overflow: visible;
+}
+
+.root:focus {
+  outline: none;
+}
+
+.root:focus-visible {
+  outline: 2px solid #f4f4f5;
+  outline-offset: 6px;
+}
+
+.nested {
+  width: var(--ui3d-w);
+  height: var(--ui3d-h);
+  perspective: none;
+}
+
+.nested .front {
+  font-size: 0.875rem;
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.group > .root:nth-child(6n + 2) {
+  --ui3d-tilt-x: 10deg;
+  --ui3d-tilt-y: 16deg;
+  --ui3d-tilt-z: 3deg;
+}
+
+.group > .root:nth-child(6n + 3) {
+  --ui3d-tilt-x: -8deg;
+  --ui3d-tilt-y: -14deg;
+  --ui3d-tilt-z: 5deg;
+}
+
+.group > .root:nth-child(6n + 4) {
+  --ui3d-tilt-x: 14deg;
+  --ui3d-tilt-y: 8deg;
+  --ui3d-tilt-z: -6deg;
+}
+
+.group > .root:nth-child(6n + 5) {
+  --ui3d-tilt-x: -6deg;
+  --ui3d-tilt-y: 20deg;
+  --ui3d-tilt-z: -3deg;
+}
+
+.group > .root:nth-child(6n) {
+  --ui3d-tilt-x: 8deg;
+  --ui3d-tilt-y: -10deg;
+  --ui3d-tilt-z: 6deg;
+}
+
+.box {
+  position: relative;
+  width: var(--ui3d-w);
+  height: var(--ui3d-h);
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+}
+
+.spin {
+  transform: rotateX(var(--ui3d-tilt-x)) rotateY(var(--ui3d-tilt-y))
+    rotateZ(var(--ui3d-tilt-z));
+  animation: ui3d-spin 8s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.face {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+
+.front,
+.back {
+  inset: 0;
+  width: var(--ui3d-w);
+  height: var(--ui3d-h);
+}
+
+.front {
+  background: var(--ui3d-face);
+  color: var(--ui3d-ink);
+  font-family: var(--ui3d-font);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transform: translateZ(calc(var(--ui3d-d) / 2));
+}
+
+.back {
+  background: color-mix(in srgb, var(--ui3d-face) 40%, black);
+  transform: rotateY(180deg) translateZ(calc(var(--ui3d-d) / 2));
+}
+
+.right,
+.left {
+  top: 0;
+  left: 50%;
+  width: var(--ui3d-d);
+  height: var(--ui3d-h);
+  margin-left: calc(var(--ui3d-d) / -2);
+}
+
+.right {
+  background: color-mix(in srgb, var(--ui3d-face) 55%, black);
+  transform: rotateY(90deg) translateZ(calc(var(--ui3d-w) / 2));
+}
+
+.left {
+  background: color-mix(in srgb, var(--ui3d-face) 70%, white);
+  transform: rotateY(-90deg) translateZ(calc(var(--ui3d-w) / 2));
+}
+
+.top,
+.bottom {
+  top: 50%;
+  left: 0;
+  width: var(--ui3d-w);
+  height: var(--ui3d-d);
+  margin-top: calc(var(--ui3d-d) / -2);
+}
+
+.top {
+  background: color-mix(in srgb, var(--ui3d-face) 70%, white);
+  transform: rotateX(90deg) translateZ(calc(var(--ui3d-h) / 2));
+}
+
+.bottom {
+  background: color-mix(in srgb, var(--ui3d-face) 55%, black);
+  transform: rotateX(-90deg) translateZ(calc(var(--ui3d-h) / 2));
+}
+
+@keyframes ui3d-spin {
+  from {
+    transform: rotateX(calc(var(--ui3d-tilt-x) - 10deg))
+      rotateY(calc(var(--ui3d-tilt-y) - 14deg))
+      rotateZ(calc(var(--ui3d-tilt-z) - 4deg));
+  }
+
+  to {
+    transform: rotateX(calc(var(--ui3d-tilt-x) + 10deg))
+      rotateY(calc(var(--ui3d-tilt-y) + 14deg))
+      rotateZ(calc(var(--ui3d-tilt-z) + 4deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+    transform: rotateX(var(--ui3d-tilt-x)) rotateY(var(--ui3d-tilt-y))
+      rotateZ(var(--ui3d-tilt-z));
+  }
+}

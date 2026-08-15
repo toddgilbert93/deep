@@ -1,0 +1,22 @@
+.root {
+  --ui3d-d: 4px;
+  --ui3d-ink: #f5f5f5;
+  --ui3d-font: inherit;
+  --ui3d-shade: color-mix(in srgb, var(--ui3d-ink) 40%, black);
+  display: inline-block;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui3d-ink);
+  font-family: var(--ui3d-font);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-shadow:
+    1px 1px 0 var(--ui3d-shade),
+    2px 2px 0 var(--ui3d-shade),
+    3px 3px 0 var(--ui3d-shade),
+    4px 4px 0 var(--ui3d-shade);
+}
