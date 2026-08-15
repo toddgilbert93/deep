@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 
-import { SpecRenderer } from "@/app/_components/spec-renderer/SpecRenderer";
+import { DesignRenderer } from "@/app/_components/design-renderer/DesignRenderer";
 import { RECONSTRUCTION_HIGHLIGHT_COLOR } from "@/lib/reconstruction/events";
 import {
   selectOrderedElements,
-  selectOrderedNodes,
   type JobCounts,
   type ReconstructionJobState,
 } from "@/lib/reconstruction/reducer";
@@ -41,19 +39,21 @@ const COUNT_LABELS: Array<{ key: keyof JobCounts; label: string }> = [
  * Renders one conversion job by status:
  * - connecting/running → Phase 1 progress bar, Phase 2 stage tracker + counts,
  *   and (once elements or nodes arrive) the Phase 3 live source/reconstruction panes;
- * - completed → summary bar + full-width `SpecRenderer`;
+ * - completed → summary bar + full-width `DesignRenderer`;
  * - failed → alert with safe copy and retry when allowed;
  * - transport drop → inline notice over the last received state.
  */
 export function ConversionPanel({ job, onRetry, onCancel, onDismiss }: ConversionPanelProps) {
   const elapsedMs = useElapsed(job.startedAt, job.finishedAt);
 
-  if (job.status === "completed" && job.result) {
+  if (job.status === "completed" && (job.page || job.result)) {
     return (
       <div className={styles.panel}>
         <LiveStatus text="Conversion complete." />
         <CompletedView
+          page={job.page}
           result={job.result}
+          sourceUrl={job.sourceUrl}
           completion={job.completion}
           elapsedMs={elapsedMs}
           onConvertAnother={onDismiss}
@@ -84,17 +84,12 @@ function RunningView({ job, elapsedMs, onRetry, onCancel, onDismiss }: RunningVi
   const detail = copy?.detail ?? "Opening a connection to the conversion service.";
   const disconnected = job.connection === "disconnected";
   const elements = selectOrderedElements(job);
-  const nodes = selectOrderedNodes(job);
-  const showLive = elements.length > 0 || nodes.length > 0;
+  // The design pipeline streams whole-page snapshots and no per-element events,
+  // so the source column only appears for jobs that actually send them.
+  const showSourceColumn = elements.length > 0;
+  const showLive = job.page !== null || showSourceColumn;
   const focus = job.focus;
   const highlightColor = focus?.highlightColor || RECONSTRUCTION_HIGHLIGHT_COLOR;
-  const highlightNodeIds = focus?.reconstructionNodeIds ?? [];
-  const annotations = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (!focus?.annotation) return map;
-    for (const id of focus.reconstructionNodeIds) map[id] = focus.annotation;
-    return map;
-  }, [focus]);
   const counts = COUNT_LABELS.filter((entry) => job.counts[entry.key] !== undefined);
   const liveText = disconnected
     ? "Connection lost. Showing the last received state."
@@ -170,33 +165,34 @@ function RunningView({ job, elapsedMs, onRetry, onCancel, onDismiss }: RunningVi
 
       {/* Phase 3: live reconstruction */}
       {showLive ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <SourceElementList elements={elements} focus={focus} expectedCount={job.counts.elements} />
+        <div
+          className={
+            showSourceColumn
+              ? "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+              : "grid grid-cols-1 gap-4"
+          }
+        >
+          {showSourceColumn ? (
+            <SourceElementList elements={elements} focus={focus} expectedCount={job.counts.elements} />
+          ) : null}
           <section className={styles.livePane} aria-labelledby="conversion-reconstruction-title">
             <header className={styles.paneHeader}>
               <span id="conversion-reconstruction-title" className={styles.paneTitle}>
-                Reconstruction
+                Live page
               </span>
               <span>
-                {nodes.length}
-                {job.counts.nodes !== undefined ? ` / ${job.counts.nodes}` : ""} nodes
+                {job.page ? `${job.page.stats.elements} elements` : "starting…"}
               </span>
             </header>
-            {nodes.length === 0 ? (
+            {job.page === null ? (
               <p className={styles.emptyHint}>
                 {copy?.longRunning
-                  ? "Grok is mapping the recognized elements onto 3D components…"
-                  : "Reconstructed nodes will appear here as they are validated."}
+                  ? "Grok is designing the page…"
+                  : "The 3D page will appear here as it is written."}
               </p>
             ) : (
               <div className={styles.reconstructionStage}>
-                <SpecRenderer
-                  nodes={nodes}
-                  streaming
-                  highlightNodeIds={highlightNodeIds}
-                  highlightColor={highlightColor}
-                  annotations={annotations}
-                />
+                <DesignRenderer page={job.page} highlightColor={highlightColor} />
               </div>
             )}
           </section>
