@@ -76,58 +76,93 @@ Implemented:
   source-element, reconstructed-node, completion, and failure events.
 - Mocked provider, parser, network-safety, image-cache, reconstruction, and
   workflow-event tests.
+- One automatic repair round when the model's first structured response fails
+  validation (the errors are fed back and a corrected spec is requested), an
+  abort signal that stops the billable request when the client disconnects, and
+  `MODEL_NOT_CONFIGURED` / `WORKFLOW_ABORTED` failure codes.
+- Public HTTP transport as Next.js route handlers (`src/app/api/`):
+  `POST /api/reconstruct` streams the event union as Server-Sent Events and
+  `GET /api/assets/{assetId}` serves locally cached images. Both are specified
+  in `openapi.yaml`.
+- Frontend state layer in `src/lib/reconstruction/`: type re-exports of the
+  event contract, a transport-independent reducer (job isolation, sequence
+  de-duplication, upserts, terminal handling), an injectable event-source
+  adapter (SSE over `fetch` plus a mock replayer), deterministic fixtures, and
+  frontend-owned stage copy.
+- Conversion UI (`src/app/_components/conversion/`): Phase 1 progress bar,
+  Phase 2 stage tracker with counts/elapsed time, Phase 3 live source-element
+  list and reconstruction preview with green highlights and annotations,
+  completed and failed states, cancel/retry. Append `?source=mock&fixture=<name>`
+  to the home page to replay a fixture without the backend.
+- Runtime `SpecRenderer` (`src/app/_components/spec-renderer/`) that renders a
+  validated `ReconstructionSpec` — complete or still streaming — onto the 3DUI
+  primitives inside the Deep app. `/preview` renders a demo spec.
+- Verified end to end on 2026-08-15: `https://nextjs.org/` converted through
+  the UI with `grok-4.6` in ~3 minutes (39 elements → 23 nodes, 12
+  interactions, images served through `/api/assets`).
 
 Not implemented yet:
 
-- Public backend HTTP endpoints.
-- Parallel reconstruction agents, final planning, and code generation.
-- Final request/response schemas from the teammate-owned backend contract.
+- Generated Next.js source files (the current deliverable is the live render
+  inside Deep; codegen is a possible later artifact).
+- Parallel reconstruction agents and richer per-node styling in the spec.
+- Resumable streams (reconnect by job ID + last sequence); jobs are in-process.
 - Production deployment or shared remote asset storage.
+- Collection of pages behind bot-protection WAFs (see "Known source
+  limitations").
 
-## UI/UX partner handoff
+## Product direction (2026-08-15)
 
-The partner agent is currently focused on the user-facing conversion
-experience in `src/app/`. Its immediate goal is to implement Phase 1 and design
-the frontend state model so Phases 2 and 3 can be added without replacing it.
+The owner's priority is the best-looking result: a faithful reproduction of the
+source page — its layout, colours, fonts, text and imagery — lifted into 3D
+with depth, tilt and lighting, rendered live inside Deep. The 3DUI primitives
+are rough guidance and a starting palette, not a source of truth: renderer and
+prompt logic may extend styling, add its own depth surfaces, or bypass a
+primitive when that makes the final output look better. Existing code and
+contracts are guidance too; when the desired outcome is unclear, ask the owner
+rather than inferring intent from older code. The model is expected to gain
+rich, validated per-node styling (colours, sizes, spacing, depth, alignment,
+backgrounds) so it can match the source closely.
 
-UI/UX agent responsibilities:
+## Known source limitations
 
-- Own the URL submission experience, loading/progress presentation, conversion
-  status UI, streamed reconstruction preview, error states, retry behavior,
-  responsive layout, and accessibility.
-- Build a reducer or equivalent state layer around the event union documented
-  below. Keep it independent from the eventual SSE/WebSocket/fetch transport.
-- Use `stage` for status selection, `progress` for the loading indicator,
-  `sequence` for ordering, and stable IDs for element/node upserts.
-- Design Phase 3 overlays around `focus.highlightColor` and `annotation` rather
-  than deriving highlights from model text.
-- Use deterministic mock event fixtures while the public streaming endpoint is
-  absent. Fixtures should cover success, failure, duplicate or out-of-order
-  events, reconnection, an empty image set, and a long-running model stage.
-- Keep frontend-only implementation in `src/`; do not import Node-only backend
-  modules into client components. Shared wire types should eventually be
-  generated from or synchronized with `openapi.yaml`.
-- Read `src/app/3DUI/instructions.md` before using or changing the approved 3D
-  component library.
+- `https://x.ai/` is behind a Cloudflare WAF that returns 403 to any
+  non-browser TLS client (Node `fetch`, curl, even with full browser headers),
+  while a real browser loads it. The browser-free collector therefore cannot
+  convert x.ai today; `https://docs.x.ai/overview` is fetchable and is the
+  closest x.ai-family target. Supporting WAF-protected pages needs a
+  headless-browser collector, which is a project decision (new dependency and a
+  change to the browser-free design).
+- Node's `net.BlockList` matches IPv4 addresses through their IPv4-mapped IPv6
+  form, so a `::ffff:0:0/96` rule blocks every public IPv4 site. Do not add it
+  back; the IPv4 rules already cover mapped literals.
 
-Backend agent responsibilities:
+## Frontend/backend split
 
-- Own collection, parsing, local asset persistence, model calls, validation,
-  orchestration, event production, and the future streaming HTTP transport.
-- Preserve the event semantics in
-  `backend/src/workflow/reconstruction-events.ts` and notify the UI owner before
-  making a breaking event change.
-- Add the agreed public streaming endpoint to `openapi.yaml` before either side
-  hardcodes its route, request body, or transport details.
-
-Current integration limitation: `webpage:reconstruct` proves the full workflow
-and emits the frontend event objects, but there is not yet a browser-accessible
-backend endpoint. The UI agent should build against mocked events and an
-injectable event-source adapter, not invoke the backend CLI from the browser.
+- Frontend (`src/`): URL submission, progress, streamed preview, error/retry,
+  the runtime renderer, and the route handlers under `src/app/api/` that adapt
+  the backend workflow to HTTP. Client components must only `import type` from
+  backend modules; route handlers may import backend values.
+- Backend (`backend/`): collection, parsing, local assets, model calls,
+  validation, orchestration, and event production. Preserve the event semantics
+  in `backend/src/workflow/reconstruction-events.ts`; a breaking event change
+  needs a matching update to `openapi.yaml`, `src/lib/reconstruction/`, and the
+  fixtures.
 
 ## Repository map
 
 - `src/app/` — Next.js frontend application.
+- `src/app/api/` — route handlers adapting the backend workflow to HTTP
+  (`reconstruct` SSE stream, `assets/[assetId]` image serving).
+- `src/app/_components/conversion/` — progress bar, stage tracker, source
+  element list, completed/failed views, and the conversion panel.
+- `src/app/_components/spec-renderer/` — runtime renderer from
+  `ReconstructionSpec` to 3DUI primitives, plus a demo spec.
+- `src/app/preview/` — renders the demo spec for eyeballing the renderer.
+- `src/lib/reconstruction/` — frontend event types, reducer, event-source
+  adapters (SSE + mock), fixtures, stage copy, spec-tree helpers, and the
+  `useReconstruction` hook; `server/` holds SSE framing and request validation
+  used by the route handlers. Tests live in `__tests__/`.
 - `src/themes/` — Deep colour tokens: near-black surface, electric-blue accents.
 - `src/fonts/` — Quantico, the only UI face.
 - `public/` — frontend static assets.
@@ -163,8 +198,9 @@ injectable event-source adapter, not invoke the backend CLI from the browser.
 - Treat `openapi.yaml` as the integration boundary between teammates.
 - Do not commit API keys or `.env` files. The repository `.gitignore` excludes
   `.env*` files.
-- The backend runtime is Node.js with TypeScript. No backend HTTP framework has
-  been selected yet.
+- The backend runtime is Node.js with TypeScript. The public HTTP surface is
+  Next.js route handlers in `src/app/api/` (no separate server); keep them thin
+  and keep workflow logic in `backend/`.
 - Keep model-provider calls behind `backend/src/providers/` so workflow logic
   is not coupled directly to Grok/xAI transport details.
 - Prefer structured, schema-validated agent outputs over free-form text. Use
@@ -176,8 +212,10 @@ injectable event-source adapter, not invoke the backend CLI from the browser.
 - Do not send raw HTML or framework JavaScript to Grok. Send the compact UI
   graph produced by `webpage:parse`.
 - Agents reconstruct the source webpage; they are not primarily UX critics.
-- Generated pages must compose existing 3DUI primitives. Do not invent or
-  modify primitives during page generation.
+- Prefer the 3DUI primitives as the vocabulary of the reconstruction, but the
+  final look wins: the renderer may add its own depth surfaces or styling when
+  a primitive fights the source layout (see "Product direction"). Do not modify
+  the primitives in `src/app/3DUI/_lib/` during page generation.
 - Preserve source text, hierarchy, navigation, form behavior, accessibility,
   and parsed UX connections unless the reconstruction contract says otherwise.
 - Update this guide whenever the project layout or architectural boundaries
@@ -191,9 +229,12 @@ injectable event-source adapter, not invoke the backend CLI from the browser.
    source element to a 3DUI primitive or an explicitly preserved HTML element.
 4. Compose the mapped elements into a page layout that resembles the source.
 5. Recreate navigation, forms, controls, and other parsed connections.
-6. Generate Next.js source using the approved components and local assets.
-7. Validate schemas, TypeScript, lint, accessibility semantics, and component
-   usage before returning the generated page.
+6. Stream the validated nodes to the UI and render the spec live inside Deep
+   with the runtime `SpecRenderer` (generated source files may become a later,
+   secondary artifact).
+7. Validate schemas, evidence links, hierarchy, and local assets before any
+   node reaches the UI; the renderer only ever renders validated data as text
+   and props, never as markup.
 
 Current primitive mapping guidance:
 
@@ -275,10 +316,18 @@ Run the frontend:
 npm run dev
 ```
 
-Run all backend tests and project checks:
+Run the app end to end: create `.env.local` with `XAI_API_KEY` (see
+`.env.example`), `npm run dev`, open http://localhost:3000, paste a public URL
+and press Go Deep. Append `?source=mock&fixture=success` (or `failure`,
+`failure-retryable`, `out-of-order`, `empty-images`, `long-model-stage`,
+`reconnection`) to replay a fixture without the backend. `/preview` renders a
+demo spec through the renderer.
+
+Run all tests and project checks:
 
 ```sh
 npm run backend:test
+npm run frontend:test
 npx tsc --noEmit
 npm run lint
 ```

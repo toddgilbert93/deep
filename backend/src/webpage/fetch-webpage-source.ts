@@ -415,10 +415,13 @@ function createBlockedAddressList(): BlockList {
     list.addSubnet(network, prefix, "ipv4");
   }
 
+  // Do not add the IPv4-mapped range (`::ffff:0:0/96`) here. Node's BlockList
+  // compares IPv4 addresses through their IPv4-mapped IPv6 form, so that rule
+  // blocks every public IPv4 address. IPv4-mapped literals such as
+  // `::ffff:127.0.0.1` are already matched by the IPv4 rules above.
   const ipv6Ranges: Array<[string, number]> = [
     ["::", 128],
     ["::1", 128],
-    ["::ffff:0:0", 96],
     ["fc00::", 7],
     ["fe80::", 10],
     ["ff00::", 8],

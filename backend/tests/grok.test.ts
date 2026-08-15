@@ -147,3 +147,25 @@ test("surfaces API errors without exposing the API key", async () => {
     return true;
   });
 });
+
+test("combines the caller's abort signal with the request timeout", async () => {
+  const controller = new AbortController();
+  let capturedSignal: AbortSignal | null | undefined;
+  const client = new GrokClient({
+    apiKey: "test-key",
+    fetchImpl: async (_input, init) => {
+      capturedSignal = init?.signal;
+      controller.abort();
+      assert.equal(capturedSignal?.aborted, true);
+      throw new DOMException("The operation was aborted.", "AbortError");
+    },
+  });
+
+  await assert.rejects(
+    client.generateText("hello", { signal: controller.signal }),
+    (error: unknown) =>
+      error instanceof DOMException && error.name === "AbortError",
+  );
+  assert.ok(capturedSignal);
+  assert.notEqual(capturedSignal, controller.signal);
+});

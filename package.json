@@ -8,12 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "backend:test": "tsx --test backend/tests/*.test.ts",
+    "frontend:test": "tsx --test \"src/lib/**/__tests__/*.test.ts\"",
     "grok:check": "tsx backend/scripts/check-grok.ts",
     "grok:models": "tsx backend/scripts/list-grok-models.ts",
     "webpage:pull": "tsx backend/scripts/pull-webpage.ts",
     "webpage:parse": "tsx backend/scripts/parse-webpage.ts",
     "webpage:reconstruct": "tsx backend/scripts/reconstruct-webpage.ts",
-    "reconstruction:schema": "tsx backend/scripts/print-reconstruction-schema.ts"
+    "reconstruction:schema": "tsx backend/scripts/print-reconstruction-schema.ts",
+    "webpage:design": "tsx backend/scripts/design-webpage.ts"
   },
   "dependencies": {
     "acorn": "^8.18.0",

@@ -17,8 +17,10 @@ export default function Home() {
         </h1>
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-8 pb-24">
-        <GoDeepForm />
+      <main className="flex flex-1 flex-col items-center px-4 pb-24 pt-8 sm:px-8">
+        <div className="flex w-full max-w-6xl flex-1 flex-col">
+          <GoDeepForm />
+        </div>
       </main>
     </div>
   );

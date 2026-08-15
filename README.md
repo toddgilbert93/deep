@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Deep
 
-## Getting Started
+Deep takes a public webpage URL and reconstructs it as a similar 3D webpage.
+The backend fetches and parses the page (browser-free, JavaScript never
+executed), caches its images locally, asks Grok for an evidence-linked
+reconstruction specification, validates it, and streams progress to the UI,
+which renders the result live with the 3D primitives in `src/app/3DUI/_lib/`.
 
-First, run the development server:
+See `AGENTS.md` for the project guide, architecture, and event contract, and
+`backend/README.md` for backend details.
 
-```bash
+## Setup
+
+```sh
+npm ci
+cp .env.example .env.local   # then put your xAI key in XAI_API_KEY
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000, paste a URL, and press **Go Deep**. Conversions
+make billable xAI requests and take a few minutes for larger pages.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `http://localhost:3000/?source=mock&fixture=success` replays a deterministic
+  fixture without touching the backend (also `failure`, `failure-retryable`,
+  `out-of-order`, `empty-images`, `long-model-stage`, `reconnection`).
+- `http://localhost:3000/preview` renders a demo spec through the renderer.
+- `http://localhost:3000/library` is the visual catalog of 3D primitives.
 
-This project uses Quantico as its only UI face, with an electric-blue accent on near-black.
+## Checks
 
-## Learn More
+```sh
+npm run backend:test
+npm run frontend:test
+npx tsc --noEmit
+npm run lint
+```
 
-To learn more about Next.js, take a look at the following resources:
+## CLI
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+npm run webpage:parse -- https://example.com          # graph + local images, no model call
+npm run --silent webpage:reconstruct -- https://example.com > spec.json 2> events.ndjson
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The CLI reads `XAI_API_KEY` from the shell environment (export it, or
+`set -a; source .env.local; set +a`).
 
-## Deploy on Vercel
+## HTTP API
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Defined in `openapi.yaml`: `POST /api/reconstruct` (JSON `{ url, jobId? }` →
+Server-Sent Events of the workflow event union) and `GET /api/assets/{assetId}`
+(locally cached page images).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Design
+
+Quantico is the only UI face; electric blue on near-black; hard corners. The
+product goal is a faithful reproduction of the source page lifted into 3D with
+depth — the primitives are a palette, not a cage.

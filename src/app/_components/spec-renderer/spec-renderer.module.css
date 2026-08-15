@@ -1,0 +1,226 @@
+/*
+ * SpecRenderer chrome: highlight outlines, floating annotations, and the small
+ * status lines. Everything else (backgrounds, ink, fonts) comes from the
+ * --spec-* variables set inline on the root from the spec's page theme.
+ */
+
+.root {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.root * {
+  box-sizing: border-box;
+}
+
+.leaf {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.inlineLeaf {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+.heading {
+  margin: 0;
+  font: inherit;
+  line-height: 1.1;
+}
+
+.textBlock {
+  margin: 0;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.chromeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+}
+
+.carouselStage {
+  position: relative;
+  width: 100%;
+  height: 520px;
+}
+
+.link {
+  color: var(--spec-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  border-radius: 0;
+}
+
+.link:focus-visible,
+.clickable:focus-visible,
+.field:focus-visible {
+  outline: 2px solid var(--spec-accent);
+  outline-offset: 3px;
+}
+
+.blockLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.field {
+  font: inherit;
+  color: var(--spec-ink);
+  background: color-mix(in srgb, var(--spec-surface) 85%, var(--spec-ink) 15%);
+  border: 1px solid var(--spec-accent);
+  border-radius: 0;
+  padding: 8px 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.field::placeholder {
+  color: color-mix(in srgb, var(--spec-ink) 55%, transparent);
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.paragraph {
+  margin: 0;
+}
+
+.formNote,
+.muted,
+.footer {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--spec-ink) 60%, transparent);
+}
+
+.footer {
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--spec-accent) 45%, transparent);
+}
+
+.footer::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--spec-accent);
+  animation: spec-blink 1.4s ease-in-out infinite;
+}
+
+.highlight {
+  position: relative;
+  outline: 2px solid var(--spec-highlight);
+  outline-offset: 4px;
+  border-radius: 0;
+  animation: spec-pulse 1.6s ease-in-out infinite;
+}
+
+.annotation {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  max-width: min(320px, 90vw);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-align: left;
+  white-space: normal;
+  color: var(--spec-highlight);
+  background: rgb(10 6 4 / 92%);
+  border: 1px solid var(--spec-highlight);
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 5;
+  animation: spec-annotation-in 220ms ease-out;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes spec-pulse {
+  0%,
+  100% {
+    outline-color: var(--spec-highlight);
+  }
+
+  50% {
+    outline-color: color-mix(in srgb, var(--spec-highlight) 35%, transparent);
+  }
+}
+
+@keyframes spec-annotation-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spec-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlight,
+  .annotation,
+  .footer::before {
+    animation: none;
+  }
+}

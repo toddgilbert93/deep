@@ -34,6 +34,29 @@ export interface GrokJsonSchemaFormat {
 
 export interface GrokGenerateOptions {
   responseFormat?: GrokJsonSchemaFormat;
+  /**
+   * Optional caller-owned abort signal (for example a disconnected HTTP
+   * client). It is combined with the client's request timeout so either one
+   * cancels the in-flight, billable request.
+   */
+  signal?: AbortSignal;
+}
+
+export interface GrokStreamOptions extends GrokGenerateOptions {
+  /** Receives each text delta as it arrives. */
+  onDelta?: (delta: string) => void | Promise<void>;
+  /** Fires once, when the first text delta arrives. */
+  onFirstDelta?: () => void | Promise<void>;
+  /** Receives reasoning-summary deltas when the model emits them. */
+  onReasoning?: (delta: string) => void | Promise<void>;
+  /** Overrides the client timeout for a long generation. */
+  timeoutMs?: number;
+  /**
+   * Reasoning budget. On grok-4.6 the default spends a long time thinking
+   * before the first token (176s on a real design brief); "low" cuts that to a
+   * few seconds with no loss of design quality for this task.
+   */
+  reasoningEffort?: "low" | "high";
 }
 
 export interface GrokModel {
@@ -44,6 +67,8 @@ export interface GrokModel {
 export interface GrokClientOptions {
   apiKey?: string;
   model?: string;
+  /** Defaults to `XAI_REASONING_EFFORT`, then "low". */
+  reasoningEffort?: "low" | "high";
   baseUrl?: string;
   timeoutMs?: number;
   fetchImpl?: FetchImplementation;
@@ -94,6 +119,7 @@ export class GrokClient {
   private readonly apiKey?: string;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly reasoningEffort?: "low" | "high";
   private readonly fetchImpl: FetchImplementation;
 
   constructor(options: GrokClientOptions = {}) {
@@ -106,6 +132,10 @@ export class GrokClient {
       DEFAULT_BASE_URL
     ).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? 360_000;
+    this.reasoningEffort =
+      options.reasoningEffort ??
+      (process.env.XAI_REASONING_EFFORT?.trim() as "low" | "high" | undefined) ??
+      "low";
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -132,7 +162,10 @@ export class GrokClient {
           ? { text: { format: options.responseFormat } }
           : {}),
       }),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: combineAbortSignals(
+        AbortSignal.timeout(this.timeoutMs),
+        options.signal,
+      ),
     });
 
     const body = await parseResponseBody<XaiResponseBody>(response);
@@ -150,6 +183,145 @@ export class GrokClient {
       model,
       text,
       usage: parseUsage(body.usage),
+    };
+  }
+
+  /**
+   * Streams a text generation over the Responses API SSE transport, invoking
+   * `onDelta` as tokens arrive and resolving with the assembled response.
+   *
+   * Streaming is what keeps a long design generation feeling live: the caller
+   * can forward deltas to the browser instead of blocking on one slow request,
+   * and a stalled connection surfaces as a missing delta rather than a
+   * multi-minute hang.
+   */
+  async streamText(
+    input: string | GrokMessage[],
+    options: GrokStreamOptions = {},
+  ): Promise<GrokTextResponse> {
+    const apiKey = this.requireApiKey();
+
+    if (typeof input === "string" ? !input.trim() : input.length === 0) {
+      throw new GrokConfigurationError("Grok input must not be empty.");
+    }
+
+    const effort = options.reasoningEffort ?? this.reasoningEffort;
+    const response = await this.fetchImpl(`${this.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        input,
+        stream: true,
+        ...(effort ? { reasoning: { effort } } : {}),
+        ...(options.responseFormat
+          ? { text: { format: options.responseFormat } }
+          : {}),
+      }),
+      signal: combineAbortSignals(
+        AbortSignal.timeout(options.timeoutMs ?? this.timeoutMs),
+        options.signal,
+      ),
+    });
+
+    if (!response.ok) {
+      const body = await parseResponseBody<XaiErrorBody>(response).catch(
+        () => ({}) as XaiErrorBody,
+      );
+      throw createApiError(response, body);
+    }
+    if (!response.body) {
+      throw new GrokApiError(502, "The streaming response has no body.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let text = "";
+    let sawFirstDelta = false;
+    let id: string | undefined;
+    let model: string | undefined;
+    let usage: GrokUsage | undefined;
+
+    const handleEvent = async (event: Record<string, unknown>): Promise<void> => {
+      const type = typeof event.type === "string" ? event.type : "";
+      const nested = isRecord(event.response) ? event.response : undefined;
+      if (nested) {
+        if (typeof nested.id === "string") id = nested.id;
+        if (typeof nested.model === "string") model = nested.model;
+        const nestedUsage = parseUsage(nested.usage);
+        if (nestedUsage) usage = nestedUsage;
+      }
+
+      if (type === "response.output_text.delta" && typeof event.delta === "string") {
+        if (!sawFirstDelta) {
+          sawFirstDelta = true;
+          await options.onFirstDelta?.();
+        }
+        text += event.delta;
+        await options.onDelta?.(event.delta);
+        return;
+      }
+      if (
+        type === "response.reasoning_summary_text.delta" &&
+        typeof event.delta === "string"
+      ) {
+        await options.onReasoning?.(event.delta);
+        return;
+      }
+      if (type === "response.output_text.done" && typeof event.text === "string") {
+        // Prefer the authoritative final text when the API supplies it.
+        if (event.text.length >= text.length) text = event.text;
+        return;
+      }
+      if (type === "error" || type === "response.failed") {
+        const message = isRecord(event.error)
+          ? (firstNonEmptyString(event.error.message, event.error.code) ??
+            "The streaming request failed.")
+          : "The streaming request failed.";
+        throw new GrokApiError(502, message);
+      }
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let newline = buffer.indexOf("\n");
+        while (newline !== -1) {
+          const line = buffer.slice(0, newline).replace(/\r$/, "").trim();
+          buffer = buffer.slice(newline + 1);
+          newline = buffer.indexOf("\n");
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          if (isRecord(parsed)) await handleEvent(parsed);
+        }
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+
+    if (!text.trim()) {
+      throw new GrokApiError(502, "The streaming response produced no text.");
+    }
+
+    return {
+      id: id ?? "stream",
+      model: model ?? this.model,
+      text,
+      usage,
     };
   }
 
@@ -197,6 +369,17 @@ export class GrokClient {
 
     return this.apiKey;
   }
+}
+
+function combineAbortSignals(
+  timeoutSignal: AbortSignal,
+  callerSignal?: AbortSignal,
+): AbortSignal {
+  if (!callerSignal) {
+    return timeoutSignal;
+  }
+  // Node >= 20 provides AbortSignal.any; whichever signal aborts first wins.
+  return AbortSignal.any([timeoutSignal, callerSignal]);
 }
 
 async function parseResponseBody<T>(response: Response): Promise<T> {

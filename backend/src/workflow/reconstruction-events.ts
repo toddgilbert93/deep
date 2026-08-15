@@ -4,6 +4,7 @@ import type {
   ReconstructionSpec,
 } from "../reconstruction/reconstruction-spec";
 import type { UiElement } from "../webpage/parse-webpage-ui";
+import type { DesignPage } from "../design/design-tree";
 
 export const RECONSTRUCTION_EVENT_VERSION = "1.0" as const;
 export const RECONSTRUCTION_HIGHLIGHT_COLOR = "#22c55e" as const;
@@ -13,6 +14,8 @@ export type ReconstructionStage =
   | "parsing_dom"
   | "caching_assets"
   | "preparing_agent"
+  | "designing"
+  | "rendering"
   | "reconstructing"
   | "validating_spec"
   | "presenting_result"
@@ -80,6 +83,19 @@ export interface ReconstructionNodeEvent extends ReconstructionEventBase {
   annotation: string;
 }
 
+/**
+ * A snapshot of the page Grok is designing, parsed into the validated
+ * `DesignPage` tree. Snapshots are idempotent: replace the whole preview with
+ * the newest one. `partial` is true while the model is still streaming.
+ */
+export interface DesignPageEvent extends ReconstructionEventBase {
+  type: "design.page";
+  message: string;
+  page: DesignPage;
+  /** Generated characters received so far, for a live "building" indicator. */
+  generatedCharacters: number;
+}
+
 export interface ReconstructionCompletedEvent extends ReconstructionEventBase {
   type: "workflow.completed";
   message: string;
@@ -87,7 +103,10 @@ export interface ReconstructionCompletedEvent extends ReconstructionEventBase {
   model: string;
   responseId: string;
   usage?: GrokUsage;
-  result: ReconstructionSpec;
+  /** Present for design-pipeline jobs. */
+  page?: DesignPage;
+  /** Present for legacy spec-pipeline jobs. */
+  result?: ReconstructionSpec;
 }
 
 export interface ReconstructionFailedEvent extends ReconstructionEventBase {
@@ -102,6 +121,7 @@ export interface ReconstructionFailedEvent extends ReconstructionEventBase {
 
 export type ReconstructionEvent =
   | ReconstructionStatusEvent
+  | DesignPageEvent
   | SourceElementEvent
   | ReconstructionNodeEvent
   | ReconstructionCompletedEvent
@@ -109,6 +129,7 @@ export type ReconstructionEvent =
 
 export type ReconstructionEventInput =
   | Omit<ReconstructionStatusEvent, keyof ReconstructionEventBase>
+  | Omit<DesignPageEvent, keyof ReconstructionEventBase>
   | Omit<SourceElementEvent, keyof ReconstructionEventBase>
   | Omit<ReconstructionNodeEvent, keyof ReconstructionEventBase>
   | Omit<ReconstructionCompletedEvent, keyof ReconstructionEventBase>

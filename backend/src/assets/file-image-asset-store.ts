@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   access,
   mkdir,
+  readdir,
   readFile,
   rename,
   writeFile,
@@ -117,6 +118,53 @@ export class FileImageAssetStore implements ImageAssetStore {
     manifest.entries[sourceUrl] = asset;
     await this.saveCacheManifest();
     return asset;
+  }
+
+  /**
+   * Looks up a stored asset by its public ID (`asset_` + first 24 hex chars of
+   * the SHA-256). Returns `undefined` when the ID is malformed, no metadata
+   * sidecar matches, or the image file is missing.
+   */
+  async findById(assetId: string): Promise<StoredImageAsset | undefined> {
+    const match = /^asset_([0-9a-f]{24})$/.exec(assetId);
+    if (!match) {
+      return undefined;
+    }
+
+    const prefix = match[1];
+    let entries: string[];
+    try {
+      entries = await readdir(path.join(this.storageDirectory, "metadata"));
+    } catch {
+      return undefined;
+    }
+
+    for (const entry of entries) {
+      if (!entry.startsWith(prefix) || !entry.endsWith(".json")) {
+        continue;
+      }
+      const metadata = await readAssetMetadata(
+        path.join(this.storageDirectory, "metadata", entry),
+      );
+      if (!metadata || metadata.id !== assetId) {
+        continue;
+      }
+      try {
+        await access(this.resolveStorageKey(metadata.storageKey));
+      } catch {
+        return undefined;
+      }
+      return {
+        id: metadata.id,
+        sha256: metadata.sha256,
+        mimeType: metadata.mimeType,
+        bytes: metadata.bytes,
+        storageKey: metadata.storageKey,
+        metadataKey: metadata.metadataKey,
+      };
+    }
+
+    return undefined;
   }
 
   resolveStorageKey(storageKey: string): string {

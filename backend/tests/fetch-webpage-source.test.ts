@@ -25,6 +25,26 @@ test("blocks private network pages by default", async () => {
   }
 });
 
+test("allows public IPv4 and IPv4-mapped IPv6 literals while still blocking mapped private ones", async () => {
+  const fetchImpl: typeof fetch = async () =>
+    new Response("<!doctype html><title>Public</title><body>ok</body>", {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+
+  for (const url of ["http://104.18.19.80/", "http://[::ffff:104.18.19.80]/"]) {
+    const result = await fetchWebpageSource(url, { fetchImpl });
+    assert.equal(result.title, "Public");
+  }
+
+  for (const url of ["http://[::ffff:10.0.0.1]/", "http://[::ffff:a00:1]/"]) {
+    await assert.rejects(
+      fetchWebpageSource(url, { fetchImpl }),
+      /Private or reserved network address/,
+    );
+  }
+});
+
 test("collects a local page DOM and JavaScript without executing it", async (t) => {
   const indexHtml = await readFile(
     path.join(fixtureDirectory, "index.html"),

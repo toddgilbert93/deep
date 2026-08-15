@@ -9,7 +9,11 @@ import {
   ReconstructionAgentOutputError,
   type ReconstructionAgentClient,
 } from "../agents/reconstruction-agent";
-import { GrokApiError, GrokClient } from "../providers/grok";
+import {
+  GrokApiError,
+  GrokClient,
+  GrokConfigurationError,
+} from "../providers/grok";
 import type { ReconstructionSpec } from "../reconstruction/reconstruction-spec";
 import { cacheWebpageImages } from "../webpage/cache-webpage-images";
 import {
@@ -34,6 +38,12 @@ export interface ReconstructWebpageOptions {
   onEvent?: ReconstructionEventSink;
   client?: ReconstructionAgentClient;
   assetStore?: ImageAssetStore;
+  /**
+   * Cancels the conversion. The workflow checks the signal before each stage
+   * and forwards it to the model request so a disconnected client stops the
+   * billable call. Cancellation fails the job with code `WORKFLOW_ABORTED`.
+   */
+  signal?: AbortSignal;
 }
 
 export interface ReconstructWebpageResult {
@@ -44,6 +54,16 @@ export interface ReconstructWebpageResult {
   responseId: string;
 }
 
+export class ReconstructionAbortedError extends Error {
+  constructor(
+    message = "The webpage reconstruction was cancelled.",
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "ReconstructionAbortedError";
+  }
+}
+
 export async function reconstructWebpage(
   options: ReconstructWebpageOptions,
 ): Promise<ReconstructWebpageResult> {
@@ -51,9 +71,11 @@ export async function reconstructWebpage(
   const emitter = createReconstructionEventEmitter(jobId, options.onEvent);
   const client = options.client ?? new GrokClient();
   const assetStore = options.assetStore ?? new FileImageAssetStore();
+  const signal = options.signal;
   let progress = 0;
 
   try {
+    throwIfAborted(signal);
     await emitter.emit("fetching_source", (progress = 2), {
       type: "workflow.status",
       status: "started",
@@ -68,6 +90,7 @@ export async function reconstructWebpage(
       message: "Webpage source fetched.",
     });
 
+    throwIfAborted(signal);
     await emitter.emit("parsing_dom", (progress = 20), {
       type: "workflow.status",
       status: "started",
@@ -84,6 +107,7 @@ export async function reconstructWebpage(
       },
     });
 
+    throwIfAborted(signal);
     await emitter.emit("caching_assets", (progress = 38), {
       type: "workflow.status",
       status: "started",
@@ -99,6 +123,7 @@ export async function reconstructWebpage(
       counts: { images: withImages.assets.images.length },
     });
 
+    throwIfAborted(signal);
     await emitter.emit("preparing_agent", (progress = 51), {
       type: "workflow.status",
       status: "started",
@@ -131,6 +156,7 @@ export async function reconstructWebpage(
         images: withImages.assets.images.length,
       },
     });
+    throwIfAborted(signal);
     await emitter.emit("reconstructing", (progress = 60), {
       type: "workflow.status",
       status: "started",
@@ -138,6 +164,7 @@ export async function reconstructWebpage(
     });
 
     const agentResult = await createReconstructionSpec(withImages, client, {
+      signal,
       onModelResponse: async () => {
         await emitter.emit("reconstructing", (progress = 78), {
           type: "workflow.status",
@@ -150,7 +177,16 @@ export async function reconstructWebpage(
           message: "Validating components, evidence, hierarchy, and assets.",
         });
       },
+      onRepairAttempt: async () => {
+        throwIfAborted(signal);
+        await emitter.emit("reconstructing", (progress = 70), {
+          type: "workflow.status",
+          status: "progress",
+          message: "Repairing the reconstruction after validation errors.",
+        });
+      },
     });
+    throwIfAborted(signal);
     await emitter.emit("validating_spec", (progress = 84), {
       type: "workflow.status",
       status: "completed",
@@ -191,7 +227,13 @@ export async function reconstructWebpage(
       model: agentResult.response.model,
       responseId: agentResult.response.id,
     };
-  } catch (error) {
+  } catch (caught) {
+    // A fetch or model request interrupted by the caller's signal surfaces as
+    // a generic AbortError; report it as a cancellation instead.
+    const error =
+      signal?.aborted && !(caught instanceof ReconstructionAbortedError)
+        ? new ReconstructionAbortedError(undefined, { cause: caught })
+        : caught;
     const failure = classifyFailure(error);
     try {
       await emitter.emit("failed", progress, {
@@ -204,6 +246,12 @@ export async function reconstructWebpage(
       // Preserve the workflow error if the event transport is already closed.
     }
     throw error;
+  }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new ReconstructionAbortedError();
   }
 }
 
@@ -244,10 +292,24 @@ function classifyFailure(error: unknown): {
   message: string;
   retryable: boolean;
 } {
+  if (error instanceof ReconstructionAbortedError) {
+    return {
+      code: "WORKFLOW_ABORTED",
+      message: "The conversion was cancelled.",
+      retryable: true,
+    };
+  }
   if (error instanceof WebpageSourceError) {
     return {
       code: "SOURCE_FETCH_FAILED",
       message: "The webpage source could not be collected.",
+      retryable: false,
+    };
+  }
+  if (error instanceof GrokConfigurationError) {
+    return {
+      code: "MODEL_NOT_CONFIGURED",
+      message: "The reconstruction model is not configured.",
       retryable: false,
     };
   }

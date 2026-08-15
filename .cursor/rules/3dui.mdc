@@ -1,0 +1,16 @@
+---
+description: 3DUI 2D→3D library rules. Read src/app/3DUI/instructions.md before adding primitives.
+globs: src/app/3DUI/**,src/app/library/**,public/3dui/**
+alwaysApply: false
+---
+
+# 3DUI
+
+Before adding or changing a 3DUI primitive, read `src/app/3DUI/instructions.md` and follow it.
+
+- Work only in `src/app/3DUI/_lib/<your-primitive>/`.
+- CSS extrusion first. GLB only when a box cannot represent the silhouette or bevel.
+- GLB extras must use the `ui3d` recipe format. Serve meshes from `public/3dui/`. Carousel is CSS block buttons, not a moulded mesh.
+- Append one entry to `src/app/library/page.tsx`. Do not restyle the viewer or edit sibling primitives.
+- Keep motion small; pivot at the geometric center.
+- When converting multiple 2D buttons, wrap them in `Button3DGroup` (or pass distinct `tilt={n}`). Each button must have a different resting tilt.

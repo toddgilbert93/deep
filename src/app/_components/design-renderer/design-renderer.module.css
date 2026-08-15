@@ -1,0 +1,190 @@
+/*
+ * DesignRenderer chrome.
+ *
+ * Two nested elements matter here:
+ *
+ *   .gutter          <- outer wrapper. Owns the edge gutter and the overflow
+ *                       guards. The generated CSS is scoped under
+ *                       `[data-design-root]`, which is the CHILD, so a
+ *                       generated rule can never target or cancel this.
+ *   .root            <- carries [data-design-root]; generated CSS applies here
+ *                       and below.
+ */
+
+.gutter {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  /* Gutter floor: content never touches the viewport edge. 16px is the hard
+     minimum on the narrowest screens. */
+  padding: max(16px, 2vh) clamp(16px, 4vw, 64px);
+  overflow-x: hidden;
+}
+
+.root {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  --design-highlight: #22c55e;
+}
+
+.root *,
+.root *::before,
+.root *::after {
+  box-sizing: border-box;
+}
+
+/*
+ * Theme the 3DUI primitives from the source palette.
+ *
+ * Each primitive declares `--ui3d-face` / `--ui3d-ink` / `--ui3d-font` on its
+ * own root element, which blocks inheritance. These descendant selectors are
+ * more specific than the library's own `.root` rule, so they win — but an
+ * explicit `face`/`ink` attribute still wins over both, because the component
+ * writes those inline. Without this, every primitive renders light grey on a
+ * dark page.
+ */
+.root :is(button, span, div)[class*="Button3D"],
+.root [class*="Carousel3D"] button,
+.root [class*="Icon3D"] {
+  --ui3d-face: var(--design-accent);
+  --ui3d-ink: var(--design-on-accent);
+  --ui3d-font: var(--design-font);
+}
+
+.root [class*="Card3D"],
+.root [class*="Chrome3D"] {
+  --ui3d-face: var(--design-surface);
+  --ui3d-ink: var(--design-ink);
+  --ui3d-font: var(--design-font);
+}
+
+.root [class*="Text3D"],
+.root [class*="TextShadow3D"] {
+  --ui3d-ink: var(--design-ink);
+  --ui3d-font: var(--design-font);
+}
+
+/* Wide content scrolls inside itself instead of pushing the page sideways. */
+.root :is(img, svg, video, canvas, table, pre) {
+  max-width: 100%;
+}
+
+.root :is(img, svg) {
+  height: auto;
+}
+
+.root :is(table, pre) {
+  overflow-x: auto;
+}
+
+.root :is(p, h1, h2, h3, h4, h5, h6, blockquote, pre, code) {
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.errorBox {
+  margin: 0;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #ffd9d9;
+  background: rgb(60 8 8 / 70%);
+  border: 1px solid #ff6b6b;
+}
+
+/* Phase 3 streaming highlight. Colour comes from the --design-highlight custom
+   property set on the root, so no extra wrapper elements are needed. */
+.highlight {
+  outline: 2px solid var(--design-highlight);
+  outline-offset: 4px;
+  animation: design-highlight-pulse 1.6s ease-in-out infinite;
+}
+
+.carouselStage {
+  position: relative;
+  width: 100%;
+}
+
+.carouselOverflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.chromeStage {
+  position: relative;
+}
+
+.chromeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+}
+
+.inline {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+.block {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes design-highlight-pulse {
+  0%,
+  100% {
+    outline-color: var(--design-highlight);
+  }
+
+  50% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlight {
+    animation: none;
+  }
+}

@@ -1,9 +1,300 @@
 openapi: 3.1.0
 info:
   title: Deep Backend API
-  version: 0.0.0
+  version: 0.1.0
   description: >-
-    Canonical contract between the Deep frontend and backend. The initial file
-    is intentionally endpoint-free until the team imports and agrees on the
-    available backend contract.
-paths: {}
+    Canonical contract between the Deep frontend and backend. The reconstruction
+    endpoint streams the versioned workflow event union defined in
+    `backend/src/workflow/reconstruction-events.ts`; the schemas below mirror
+    that TypeScript contract and must be kept in sync with it.
+servers:
+  - url: /
+    description: Same-origin Next.js route handlers (`src/app/api/**`).
+paths:
+  /api/reconstruct:
+    post:
+      operationId: reconstructWebpage
+      summary: Start a webpage-to-3D reconstruction and stream its progress events.
+      description: >-
+        Starts one conversion job and returns a Server-Sent Events stream. Each
+        SSE message carries one `ReconstructionEvent`: the `id` field is the
+        event `sequence`, the `event` field is the event `type`, and `data` is
+        the JSON-encoded event object. Comment lines (`: ping`) are sent
+        periodically as keep-alives during long stages and must be ignored.
+        The stream ends after the terminal `workflow.completed` or
+        `workflow.failed` event. Private, loopback, and reserved network
+        destinations are always rejected for user-submitted URLs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconstructRequest"
+      responses:
+        "200":
+          description: Event stream for the job.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-cache, no-transform
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >-
+                  SSE frames. Each frame is
+                  `id: <sequence>\nevent: <type>\ndata: <ReconstructionEvent JSON>\n\n`.
+              examples:
+                status:
+                  value: |
+                    id: 1
+                    event: workflow.status
+                    data: {"eventVersion":"1.0","jobId":"job_1f2c","sequence":1,"emittedAt":"2026-08-15T12:00:00.000Z","stage":"fetching_source","progress":2,"type":"workflow.status","status":"started","message":"Fetching webpage source."}
+        "400":
+          description: The request body is missing, malformed, or the URL is not an absolute http(s) URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The reconstruction model is not configured (missing XAI_API_KEY).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/assets/{assetId}:
+    get:
+      operationId: getImageAsset
+      summary: Serve a locally cached webpage image asset.
+      description: >-
+        Returns the content-addressed image bytes stored by the backend for the
+        given `assetId` (`asset_` + first 24 hex characters of the SHA-256).
+        Responses are immutable and safe to cache.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^asset_[0-9a-f]{24}$"
+      responses:
+        "200":
+          description: The image bytes with their stored MIME type.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: public, max-age=31536000, immutable
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: The asset ID does not match the required pattern.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No stored asset matches the ID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    ReconstructRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Absolute http(s) URL of the public webpage to reconstruct.
+        jobId:
+          type: string
+          pattern: "^job_[A-Za-z0-9-]{8,64}$"
+          description: >-
+            Optional client-chosen job identifier. When supplied, every event
+            in the stream uses it, letting the client isolate state before the
+            first event arrives. The server generates one otherwise.
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    ReconstructionStage:
+      type: string
+      enum:
+        - fetching_source
+        - parsing_dom
+        - caching_assets
+        - preparing_agent
+        - reconstructing
+        - validating_spec
+        - presenting_result
+        - completed
+        - failed
+    ReconstructionEventBase:
+      type: object
+      required: [eventVersion, jobId, sequence, emittedAt, stage, progress, type]
+      properties:
+        eventVersion:
+          type: string
+          const: "1.0"
+        jobId:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+          description: Monotonically increasing per job; used for ordering and de-duplication.
+        emittedAt:
+          type: string
+          format: date-time
+        stage:
+          $ref: "#/components/schemas/ReconstructionStage"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        type:
+          type: string
+    Focus:
+      type: object
+      required: [sourceElementIds, reconstructionNodeIds, assetIds, highlightColor]
+      properties:
+        sourceElementIds:
+          type: array
+          items: { type: string }
+        reconstructionNodeIds:
+          type: array
+          items: { type: string }
+        assetIds:
+          type: array
+          items: { type: string }
+        highlightColor:
+          type: string
+          const: "#22c55e"
+    WorkflowStatusEvent:
+      allOf:
+        - $ref: "#/components/schemas/ReconstructionEventBase"
+        - type: object
+          required: [type, status, message]
+          properties:
+            type: { const: workflow.status }
+            status:
+              type: string
+              enum: [started, progress, completed]
+            message:
+              type: string
+              description: Displayable context only; the UI must never parse it to determine state.
+            counts:
+              type: object
+              properties:
+                elements: { type: integer }
+                connections: { type: integer }
+                images: { type: integer }
+                nodes: { type: integer }
+    SourceElementEvent:
+      allOf:
+        - $ref: "#/components/schemas/ReconstructionEventBase"
+        - type: object
+          required: [type, message, element, focus, annotation]
+          properties:
+            type: { const: source.element }
+            message: { type: string }
+            element:
+              type: object
+              description: Subset of the parsed `UiElement` (id, kind, tag, role, name, text, selector, parentId, state, assetId).
+              required: [id, kind, tag, role, selector]
+              properties:
+                id: { type: string }
+                kind: { type: string }
+                tag: { type: string }
+                role: { type: string }
+                name: { type: string }
+                text: { type: string }
+                selector: { type: string }
+                parentId: { type: string }
+                state: { type: object }
+                assetId: { type: string }
+            focus:
+              $ref: "#/components/schemas/Focus"
+            annotation: { type: string }
+    ReconstructionNodeEvent:
+      allOf:
+        - $ref: "#/components/schemas/ReconstructionEventBase"
+        - type: object
+          required: [type, message, node, focus, annotation]
+          properties:
+            type: { const: reconstruction.node }
+            message: { type: string }
+            node:
+              type: object
+              description: A complete, validated `ReconstructionNode` snapshot; upsert by `node.id`.
+            focus:
+              $ref: "#/components/schemas/Focus"
+            annotation: { type: string }
+    WorkflowCompletedEvent:
+      allOf:
+        - $ref: "#/components/schemas/ReconstructionEventBase"
+        - type: object
+          required: [type, status, message, model, responseId, result]
+          properties:
+            type: { const: workflow.completed }
+            status: { const: completed }
+            message: { type: string }
+            model: { type: string }
+            responseId: { type: string }
+            usage:
+              type: object
+              properties:
+                inputTokens: { type: integer }
+                outputTokens: { type: integer }
+                totalTokens: { type: integer }
+                costInUsdTicks: { type: integer }
+            result:
+              type: object
+              description: The validated `ReconstructionSpec` (schemaVersion 1.0). See `backend/src/reconstruction/reconstruction-spec-schema.ts`.
+    WorkflowFailedEvent:
+      allOf:
+        - $ref: "#/components/schemas/ReconstructionEventBase"
+        - type: object
+          required: [type, status, message, error]
+          properties:
+            type: { const: workflow.failed }
+            status: { const: failed }
+            message: { type: string }
+            error:
+              type: object
+              required: [code, retryable]
+              properties:
+                code:
+                  type: string
+                  enum:
+                    - SOURCE_FETCH_FAILED
+                    - INVALID_RECONSTRUCTION
+                    - MODEL_REQUEST_FAILED
+                    - MODEL_NOT_CONFIGURED
+                    - WORKFLOW_FAILED
+                retryable:
+                  type: boolean
+    ReconstructionEvent:
+      oneOf:
+        - $ref: "#/components/schemas/WorkflowStatusEvent"
+        - $ref: "#/components/schemas/SourceElementEvent"
+        - $ref: "#/components/schemas/ReconstructionNodeEvent"
+        - $ref: "#/components/schemas/WorkflowCompletedEvent"
+        - $ref: "#/components/schemas/WorkflowFailedEvent"
+      discriminator:
+        propertyName: type

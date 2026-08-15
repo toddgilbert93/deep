@@ -98,6 +98,14 @@ export WEBPAGE_ASSET_CACHE_DIR="/cache/path/webpage-assets"
 The project currently supports local filesystem asset storage only. Do not add
 cloud or database-backed storage without an explicit project decision.
 
+`FileImageAssetStore.findById(assetId)` resolves a public asset ID
+(`asset_` + the first 24 hex characters of the SHA-256) back to its stored
+image by scanning the metadata sidecars. It returns `undefined` for malformed
+IDs, unknown IDs, and metadata whose image file is missing, so a serving layer
+can map those cases to 400 and 404 responses without touching paths itself. Use
+`resolveStorageKey(asset.storageKey)` to obtain the on-disk path; it rejects
+keys that escape the storage directory.
+
 ## Reconstruction contract
 
 Reconstruction agents must return the versioned `ReconstructionSpec` contract
@@ -117,6 +125,30 @@ Use `RECONSTRUCTION_RESPONSE_FORMAT` as the Responses API `text.format` value.
 Before accepting an agent response, call `validateReconstructionSpec` with the
 source graph's element, connection, and image-asset IDs. This adds cross-reference,
 coverage, hierarchy, and duplicate-ID checks that JSON Schema cannot express.
+
+### Reconstruction agent
+
+`src/agents/reconstruction-agent.ts` sends the compact graph to Grok with a
+versioned system prompt that carries the primitive routing guidance from
+`../AGENTS.md`, then parses and validates the structured response.
+
+- **Repair round.** If the first response is malformed JSON or fails
+  `validateReconstructionSpec`, the agent makes exactly one follow-up request
+  containing the system prompt, the original user message, the model's previous
+  output as an assistant message, and a user message listing up to 40
+  validation errors (or `malformed JSON`) with instructions to return a
+  corrected, complete specification. The `onRepairAttempt(errors)` hook fires
+  before that request. If the repair also fails, the agent throws
+  `ReconstructionAgentOutputError` carrying the repair round's validation
+  errors. `onModelResponse` fires once, with the response that was accepted (or
+  with the repair response when it was also rejected).
+- **Abort signal.** Pass `signal` in the hooks object to forward an
+  `AbortSignal` to every model request. `GrokClient.generateText` accepts the
+  same `signal` option and combines it with its own timeout using
+  `AbortSignal.any`, so a disconnected client cancels the billable request.
+- **Input size guard.** When the serialized graph exceeds 600,000 characters,
+  each element's `name` and `text` strings are truncated to 200 characters
+  before sending. IDs, hierarchy, connections, and assets are never removed.
 
 ## Reconstruction workflow and events
 
@@ -139,6 +171,37 @@ The final validated `ReconstructionSpec` is written to stdout. Ordered progress
 events are written as newline-delimited JSON to stderr. The production frontend
 must consume these event objects through the future agreed streaming API, not
 by invoking or scraping the CLI.
+
+### Cancellation
+
+`reconstructWebpage` accepts an optional `signal: AbortSignal`. The workflow
+checks it before every stage and forwards it to the model request. When the
+signal aborts, the workflow emits `workflow.failed` with error code
+`WORKFLOW_ABORTED` and throws `ReconstructionAbortedError`. A fetch or model
+call interrupted by the signal is reported the same way instead of surfacing as
+a generic `AbortError`.
+
+### Repair status event
+
+When the agent performs its repair round, the workflow emits one additional
+`workflow.status` event: stage `reconstructing`, status `progress`, progress
+`70`, message `Repairing the reconstruction after validation errors.` It sits
+between the `reconstructing` started event (60) and the `reconstructing`
+completed event (78). Every other event keeps its existing order, stage,
+progress, and type, and sequences remain strictly increasing.
+
+### Failure codes
+
+`workflow.failed` events carry one of these `error.code` values:
+
+| Code | Cause | Retryable |
+| --- | --- | --- |
+| `SOURCE_FETCH_FAILED` | The webpage source could not be collected (blocked host, redirect, byte limit, HTTP error). | no |
+| `MODEL_NOT_CONFIGURED` | `GrokConfigurationError`: `XAI_API_KEY` is missing or the model input was empty. | no |
+| `MODEL_REQUEST_FAILED` | `GrokApiError` from xAI. | only for 429 and 5xx |
+| `INVALID_RECONSTRUCTION` | The model output failed validation after the repair round. | yes |
+| `WORKFLOW_ABORTED` | The caller's `AbortSignal` cancelled the conversion. | yes |
+| `WORKFLOW_FAILED` | Any other unexpected error. | no |
 
 ## Planned reconstruction responsibility
 
