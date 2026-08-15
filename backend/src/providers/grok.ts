@@ -25,6 +25,17 @@ export interface GrokTextResponse {
   usage?: GrokUsage;
 }
 
+export interface GrokJsonSchemaFormat {
+  type: "json_schema";
+  name: string;
+  schema: object;
+  strict?: boolean;
+}
+
+export interface GrokGenerateOptions {
+  responseFormat?: GrokJsonSchemaFormat;
+}
+
 export interface GrokModel {
   id: string;
   aliases: string[];
@@ -98,7 +109,10 @@ export class GrokClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async generateText(input: string | GrokMessage[]): Promise<GrokTextResponse> {
+  async generateText(
+    input: string | GrokMessage[],
+    options: GrokGenerateOptions = {},
+  ): Promise<GrokTextResponse> {
     const apiKey = this.requireApiKey();
 
     if (typeof input === "string" ? !input.trim() : input.length === 0) {
@@ -114,6 +128,9 @@ export class GrokClient {
       body: JSON.stringify({
         model: this.model,
         input,
+        ...(options.responseFormat
+          ? { text: { format: options.responseFormat } }
+          : {}),
       }),
       signal: AbortSignal.timeout(this.timeoutMs),
     });

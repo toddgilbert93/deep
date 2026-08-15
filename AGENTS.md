@@ -2,10 +2,59 @@
 
 ## Purpose
 
-Deep evaluates a webpage from a submitted URL. The planned backend will run
-multiple Grok-powered agents concurrently, identify UI elements, describe UX
-connections between them, and combine those findings into a stable API
-response.
+Deep reconstructs a submitted webpage as a similar 3D webpage. The backend
+collects the source page, converts it into a compact UI-element and interaction
+graph, stores image assets locally, and gives that evidence to Grok-powered
+agents. The agents create a reconstruction specification that maps source
+elements onto the approved primitives in `src/app/3DUI/_lib/`, preserves the
+page's hierarchy, content, assets, and interactions, and drives generation of
+the new page.
+
+## Product end state
+
+The end-state experience is a live, understandable webpage-to-3D conversion,
+not a request that appears frozen until a final page suddenly arrives. The UI
+will mature through three phases:
+
+### Phase 1 — Parse progress
+
+- After the user submits a URL, immediately show a simple loading bar while the
+  backend fetches and parses the webpage.
+- The backend may expose coarse progress for this phase, but it must always
+  provide clear success and failure completion states.
+
+### Phase 2 — Granular conversion status
+
+- Replace the generic in-progress state with dynamic status messages describing
+  the current work, such as fetching source, parsing the DOM, caching images,
+  mapping elements, reconstructing interactions, generating components, and
+  validating the result.
+- The backend must emit stable, machine-readable stage and progress events. UI
+  copy is owned by the frontend and must not depend on parsing log messages.
+- Events must include a job identifier, ordered sequence or timestamp, stage,
+  human-readable detail, optional progress, and an explicit terminal outcome.
+
+### Phase 3 — Live visual reconstruction
+
+- Stream the parsed and reconstructed page into the UI as it is produced rather
+  than waiting for the entire conversion to finish.
+- Highlight the source or generated UI element currently being processed with
+  a green bounding box.
+- Show floating explanatory text beside the generated content describing what
+  is being recognized, mapped, or created.
+- Backend stream events must link activity to stable source element IDs,
+  reconstruction node IDs, and local asset IDs so highlights and annotations
+  attach to the correct element.
+- Stream structured snapshots or deltas that the frontend can apply safely and
+  idempotently. Do not stream raw model reasoning, unvalidated model output, or
+  executable source fragments directly into the page.
+- The completed visualization must converge on the same validated
+  `ReconstructionSpec` used for final generation; streaming is a presentation
+  of the workflow, not a separate reconstruction format.
+
+All backend work should preserve a path toward Phase 3 even when implementing
+only Phase 1 or Phase 2. Long-running operations should expose meaningful
+progress boundaries rather than being designed as one opaque blocking call.
 
 ## Current implementation status
 
@@ -21,12 +70,14 @@ Implemented:
   fetch effects; JavaScript is downloaded but never executed.
 - Local-only image download, SHA-256 content-addressed persistence, URL cache,
   and `assetId` links from parsed image elements.
+- Versioned, strict `ReconstructionSpec` JSON Schema with source-reference,
+  hierarchy, coverage, interaction, and local-asset validation.
 - Mocked provider, parser, network-safety, and image-cache tests.
 
 Not implemented yet:
 
 - Public backend HTTP endpoints.
-- Parallel evaluation agents and final aggregation.
+- Parallel reconstruction agents, final planning, and code generation.
 - Final request/response schemas from the teammate-owned backend contract.
 - Production deployment or shared remote asset storage.
 
@@ -34,6 +85,9 @@ Not implemented yet:
 
 - `src/app/` — Next.js frontend application.
 - `public/` — frontend static assets.
+- `src/app/3DUI/_lib/` — approved 3D primitives that generated pages must use.
+  Read `src/app/3DUI/instructions.md` before changing or using the library.
+- `src/app/library/` — visual catalog of available 3D primitives.
 - `backend/` — all backend source code, tests, prompts, and backend-specific
   configuration. Read `backend/README.md` before adding backend code.
 - `backend/src/webpage/` — safe source collection and deterministic conversion
@@ -63,14 +117,48 @@ Not implemented yet:
   been selected yet.
 - Keep model-provider calls behind `backend/src/providers/` so workflow logic
   is not coupled directly to Grok/xAI transport details.
-- Prefer structured, schema-validated agent outputs over free-form text.
+- Prefer structured, schema-validated agent outputs over free-form text. Use
+  `backend/src/reconstruction/reconstruction-spec-schema.ts` as the shared
+  agent output contract and validate it with `validateReconstructionSpec`.
 - Asset storage is intentionally local filesystem storage. Do not introduce
   cloud storage or a database without an explicit project decision.
 - Never enable `--allow-private` for an untrusted or user-submitted URL.
 - Do not send raw HTML or framework JavaScript to Grok. Send the compact UI
   graph produced by `webpage:parse`.
+- Agents reconstruct the source webpage; they are not primarily UX critics.
+- Generated pages must compose existing 3DUI primitives. Do not invent or
+  modify primitives during page generation.
+- Preserve source text, hierarchy, navigation, form behavior, accessibility,
+  and parsed UX connections unless the reconstruction contract says otherwise.
 - Update this guide whenever the project layout or architectural boundaries
   change.
+
+## Reconstruction workflow
+
+1. Fetch the source HTML, first-party JavaScript, and image elements.
+2. Convert them into the compact UI graph and persist images locally.
+3. Produce a strict reconstruction specification that maps every retained
+   source element to a 3DUI primitive or an explicitly preserved HTML element.
+4. Compose the mapped elements into a page layout that resembles the source.
+5. Recreate navigation, forms, controls, and other parsed connections.
+6. Generate Next.js source using the approved components and local assets.
+7. Validate schemas, TypeScript, lint, accessibility semantics, and component
+   usage before returning the generated page.
+
+Current primitive mapping guidance:
+
+- Buttons and grouped actions → `Button3D` / `Button3DGroup`.
+- Cards and bounded content groups → `Card3D`.
+- Images with `assetId` → `Image3D` containing the locally stored image.
+- Large headings (32px+) → `Text3D`.
+- Small display text (16–24px) → `TextShadow3D` when appropriate.
+- Supported common icons → `Icon3D`.
+- Tabs or rotating groups of 3–8 items → `Carousel3D`.
+- Recessed application/window regions → `Chrome3D`.
+
+The reconstruction planner must read the actual component prop types and
+`src/app/3DUI/instructions.md`; this table is routing guidance, not permission
+to invent unsupported props.
 
 ## Common commands
 

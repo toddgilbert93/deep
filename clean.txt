@@ -26,6 +26,7 @@ Runtime dependencies declared in package.json:
 
 - acorn ^8.18.0 — parses first-party JavaScript into an AST without executing it
 - acorn-walk ^8.3.5 — traverses JavaScript ASTs for UI relationships
+- ajv ^8.20.0 — validates agent-generated reconstruction specs against JSON Schema 2020-12
 - cheerio ^1.2.0 — parses fetched HTML without executing JavaScript
 - next 16.3.1
 - react 19.2.8
@@ -59,6 +60,12 @@ To remove only the JavaScript static-analysis parser:
 
 ```sh
 npm uninstall acorn acorn-walk
+```
+
+To remove only the reconstruction-spec validator:
+
+```sh
+npm uninstall ajv
 ```
 
 All transitive npm packages and their exact versions are tracked in

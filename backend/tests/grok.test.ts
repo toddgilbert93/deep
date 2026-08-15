@@ -7,6 +7,7 @@ import {
   GrokClient,
   GrokConfigurationError,
 } from "../src/providers/grok";
+import { RECONSTRUCTION_RESPONSE_FORMAT } from "../src/reconstruction/reconstruction-spec-schema";
 
 test("requires an API key without making a request", async () => {
   let called = false;
@@ -75,6 +76,31 @@ test("calls the xAI Responses API and normalizes output", async () => {
       totalTokens: 4,
       costInUsdTicks: 123,
     },
+  });
+});
+
+test("sends a strict JSON Schema through Responses API text.format", async () => {
+  let capturedBody: unknown;
+  const client = new GrokClient({
+    apiKey: "test-key",
+    fetchImpl: async (_input, init) => {
+      capturedBody = JSON.parse(String(init?.body));
+      return Response.json({
+        id: "resp_structured",
+        model: DEFAULT_GROK_MODEL,
+        output_text: "{}",
+      });
+    },
+  });
+
+  await client.generateText("Build a reconstruction spec.", {
+    responseFormat: RECONSTRUCTION_RESPONSE_FORMAT,
+  });
+
+  assert.deepEqual(capturedBody, {
+    model: DEFAULT_GROK_MODEL,
+    input: "Build a reconstruction spec.",
+    text: { format: RECONSTRUCTION_RESPONSE_FORMAT },
   });
 });
 

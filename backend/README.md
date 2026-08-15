@@ -1,8 +1,9 @@
 # Backend
 
-This directory owns the backend for Deep: API handling, webpage inspection,
-parallel agent orchestration, Grok/xAI integration, result aggregation, schema
-validation, and backend tests.
+This directory owns the backend for Deep: webpage source collection, compact UI
+graph creation, local asset persistence, parallel reconstruction-agent
+orchestration, Grok/xAI integration, reconstruction-plan validation, API
+handling, and backend tests.
 
 The backend uses Node.js and TypeScript. No HTTP framework has been selected
 yet; the initial integration is a provider adapter that can be reused by the
@@ -97,17 +98,39 @@ export WEBPAGE_ASSET_CACHE_DIR="/cache/path/webpage-assets"
 The project currently supports local filesystem asset storage only. Do not add
 cloud or database-backed storage without an explicit project decision.
 
-## Planned responsibility
+## Reconstruction contract
+
+Reconstruction agents must return the versioned `ReconstructionSpec` contract
+in `src/reconstruction/`. It only permits the approved 3DUI components and the
+semantic HTML elements needed for layout, forms, and accessibility. Every node
+links back to source element evidence; interactions link to source connections;
+and `Image3D` nodes must use a locally stored `assetId`.
+
+The JSON Schema is compatible with xAI structured output and can be printed for
+an agent request with:
+
+```sh
+npm run --silent reconstruction:schema
+```
+
+Use `RECONSTRUCTION_RESPONSE_FORMAT` as the Responses API `text.format` value.
+Before accepting an agent response, call `validateReconstructionSpec` with the
+source graph's element, connection, and image-asset IDs. This adds cross-reference,
+coverage, hierarchy, and duplicate-ID checks that JSON Schema cannot express.
+
+## Planned reconstruction responsibility
 
 The expected high-level flow is:
 
 1. Accept a webpage URL through the API.
 2. Validate and normalize the request.
 3. Inspect or retrieve the webpage using an approved mechanism.
-4. Run specialized evaluation agents concurrently.
-5. Identify UI elements and the UX relationships between them.
-6. Validate and aggregate agent results.
-7. Return a response matching `../openapi.yaml`.
+4. Give the compact graph and 3DUI inventory to specialized reconstruction
+   agents.
+5. Map source elements and UX relationships onto approved 3DUI primitives.
+6. Validate and aggregate a strict reconstruction specification.
+7. Generate or return the inputs needed to generate the similar 3D webpage,
+   matching `../openapi.yaml`.
 
 ## Rules for future backend work
 
@@ -130,6 +153,7 @@ backend/
     agents/       Specialized webpage evaluation agents
     orchestration/ Parallel execution and result aggregation
     providers/    Grok/xAI and webpage-access adapters
+    reconstruction/ Versioned reconstruction contract and validation
   tests/
   README.md
 ```
