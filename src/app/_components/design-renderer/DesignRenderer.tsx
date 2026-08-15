@@ -423,6 +423,11 @@ function renderDeepButton(
     fontFamily: safeFontFamily(attrString(attrs, "fontfamily")),
     spin: attrFlag(attrs, "spin", true),
     disabled: attrFlag(attrs, "disabled", false),
+    // Button3D's default root is a (width + height) square so it has room to
+    // rotate, which leaves huge holes in a laid-out page. `nested` shrinks the
+    // root to exactly width x height; the perspective it gives up is supplied
+    // by the wrapper below (standalone) or by the group (see the module CSS).
+    nested: true,
     className: shell.highlight,
     style: shell.style,
     "data-design-id": shell.id || undefined,
@@ -437,7 +442,16 @@ function renderDeepButton(
         : undefined,
   };
 
-  return <Button3D {...props}>{label || "Button"}</Button3D>;
+  const button = <Button3D {...props}>{label || "Button"}</Button3D>;
+
+  // A grouped button must stay a DIRECT child of Button3DGroup, whose CSS
+  // assigns the six rest angles by nth-child; the group supplies perspective
+  // instead (see design-renderer.module.css).
+  return hints.inButtonGroup ? (
+    button
+  ) : (
+    <span className={styles.buttonSlot}>{button}</span>
+  );
 }
 
 function renderDeepButtonGroup(

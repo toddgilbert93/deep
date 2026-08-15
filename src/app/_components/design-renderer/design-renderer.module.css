@@ -110,7 +110,12 @@
   animation: design-highlight-pulse 1.6s ease-in-out infinite;
 }
 
+/* The ring is a tall band; keep neighbours clear of it so a tilted face never
+   collides with the heading that follows. */
 .carouselStage {
+  /* The ring's lower faces hang below the stage box, so the following heading
+     needs real clearance or the two collide. */
+  margin-block: 8px 64px;
   position: relative;
   width: 100%;
 }
@@ -125,6 +130,22 @@
   font-size: 14px;
 }
 
+/*
+ * Card3D has a fixed height, so long copy escaped the front face and rendered
+ * over the page. Keep the body inside the card: clamp it and hide the rest
+ * rather than letting it spill.
+ */
+/* Perspective for `nested` buttons, which give up their own. */
+.buttonSlot {
+  display: inline-block;
+  perspective: 900px;
+  vertical-align: middle;
+}
+
+.root [class*="group"] {
+  perspective: 900px;
+}
+
 .cardBody {
   display: flex;
   flex-direction: column;
@@ -132,8 +153,25 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
+  height: 100%;
   min-width: 0;
+  padding: 4px;
+  overflow: hidden;
   text-align: center;
+}
+
+.cardBody > * {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cardBody :is(p, span, div) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  overflow: hidden;
 }
 
 .chromeStage {

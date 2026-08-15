@@ -332,24 +332,70 @@ function collectSectionElements($: CheerioAPI, main: Selection): Element[] {
   return containers.slice(0, 40);
 }
 
+/**
+ * Pulls card-like items (feature grids, lists) out of a container.
+ *
+ * Two traps here, both of which produced garbage copy: an ancestor card wraps
+ * the whole grid and swallows every child's text, and `.text()` concatenates
+ * descendants with no separator, yielding "ReactThe library for web...". So
+ * keep only leaf-most candidates and read heading and body from distinct
+ * elements.
+ */
 function collectItems(
   $: CheerioAPI,
   container: Selection,
   options: ExtractDesignBriefOptions,
 ): DesignBriefItem[] {
-  const candidates = container.find("li, article, .card, [class*='card']").toArray();
+  const candidates = container
+    .find("li, article, .card, [class*='card']")
+    .toArray()
+    .filter((element) => {
+      // Drop wrappers that contain another candidate; keep the leaves.
+      const node = $(element);
+      return node.find("li, article, .card, [class*='card']").length === 0;
+    });
+
   const items: DesignBriefItem[] = [];
+  const seen = new Set<string>();
 
   for (const element of candidates) {
     if (items.length >= MAX_ITEMS_PER_BLOCK) break;
     const node = $(element);
-    const heading = cleanText(node.find("h2, h3, h4, strong, b").first().text());
-    const text = cleanText(node.find("p").first().text()) || cleanText(node.text());
+    // Card titles are frequently not headings at all: a common shape is two
+    // sibling divs, sometimes marked with data-title/data-subtitle. Read the
+    // structure rather than assuming semantic tags.
+    const parts = node
+      .children()
+      .toArray()
+      .map((child) => cleanText($(child).text()))
+      .filter(Boolean);
+
+    let heading = cleanText(
+      node.find("h2, h3, h4, h5, strong, b, [data-title]").first().text(),
+    );
+    if (!heading && parts.length >= 2 && parts[0].length <= 60) {
+      heading = parts[0];
+    }
+
+    let text =
+      cleanText(node.find("p, [data-subtitle]").first().text()) ||
+      (parts.length >= 2 ? parts.slice(1).join(" ") : "");
+    if (!text) {
+      // Single blob: strip the heading prefix that `.text()` glued to the front.
+      const whole = cleanText(node.text());
+      text = heading && whole.startsWith(heading) ? whole.slice(heading.length).trim() : whole;
+    }
+    if (heading && text === heading) text = "";
+
     if (!heading && text.length < 12) continue;
+    const key = `${heading}|${text}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
     const [image] = collectImages($, node, options, "icon");
     items.push({
       heading: heading || undefined,
-      text: heading && text === heading ? undefined : truncate(text, MAX_TEXT),
+      text: text ? truncate(text, MAX_TEXT) : undefined,
       image,
     });
   }

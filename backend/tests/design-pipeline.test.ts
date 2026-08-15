@@ -98,6 +98,70 @@ test("design brief captures identity, palette, type, and ordered blocks", () => 
   assert.equal(features?.items?.[0].heading, "Fast");
 });
 
+test("card items keep heading and body separate across common markup shapes", () => {
+  const html = SAMPLE_HTML.replace(
+    "</main>",
+    `<section><h2>Features</h2>
+       <div class="grid">
+         <a class="card"><div data-title="true"><span>Data Fetching</span></div><div data-subtitle="true">Await your data in a component.</div></a>
+         <a class="card"><div><span>Turbopack</span></div><div>An incremental bundler written in Rust.</div></a>
+         <div class="card"><h3>Routing</h3><p>File-system based routes.</p></div>
+       </div>
+     </section></main>`,
+  );
+
+  const brief = extractDesignBrief(makeSource(html));
+  const features = brief.blocks.find((block) => block.heading === "Features");
+  assert.ok(features?.items?.length, "the feature grid is captured");
+
+  const byHeading = new Map(features!.items!.map((item) => [item.heading, item.text]));
+  // Regression: `.text()` used to glue title and body into "Data FetchingAwait…",
+  // and an ancestor card swallowed the whole grid into one item.
+  assert.equal(byHeading.get("Data Fetching"), "Await your data in a component.");
+  assert.equal(byHeading.get("Turbopack"), "An incremental bundler written in Rust.");
+  assert.equal(byHeading.get("Routing"), "File-system based routes.");
+  for (const text of byHeading.values()) {
+    assert.ok(!/[a-z][A-Z]/.test(text ?? ""), `no glued words in ${JSON.stringify(text)}`);
+  }
+});
+
+test("content sections are found even when they sit outside <main>", () => {
+  const html = `<!doctype html><html><head><title>Docs</title></head><body>
+    <header><nav><a href="/a">Alpha</a><a href="/b">Beta</a><a href="/c">Gamma</a></nav></header>
+    <div id="__next"><div><h1>Hero</h1><p>${"Lead copy that is long enough to count. ".repeat(2)}</p></div>
+      <div><h2>Section One</h2><p>${"Body copy for section one. ".repeat(3)}</p></div>
+      <div><h2>Section Two</h2><p>${"Body copy for section two. ".repeat(3)}</p></div></div>
+    <footer><a href="/legal">Legal</a></footer></body></html>`;
+
+  const brief = extractDesignBrief(makeSource(html));
+  const headings = brief.blocks.map((block) => block.heading).filter(Boolean);
+  assert.ok(headings.includes("Section One"), "sections outside <main> are captured");
+  assert.ok(headings.includes("Section Two"));
+});
+
+test("palette rejects translucent and unresolvable colours", () => {
+  const brief = extractDesignBrief(makeSource(), {
+    stylesheets: [
+      ".shadow { color: #0000001a; } .line { color: rgba(255,255,255,calc(var(--o))); } .a { color: #808080; }",
+    ],
+  });
+  // A shadow tint and a calc()/var() expression are not brand colours; an
+  // unrecovered palette must report low confidence rather than guess.
+  assert.equal(brief.palette.accent, undefined);
+  assert.equal(brief.palette.confidence, "unknown");
+});
+
+test("a dark colour scheme in the source is detected", () => {
+  const brief = extractDesignBrief(makeSource(), {
+    stylesheets: [
+      "body { background-color: #ffffff; color: #111 } @media (prefers-color-scheme: dark) { body { background-color: #0b0b0f; color: #fafafa } }",
+    ],
+  });
+  assert.equal(brief.palette.prefersDark, true);
+  assert.equal(brief.palette.background, "#0b0b0f", "dark values win over light defaults");
+  assert.equal(brief.palette.ink, "#fafafa");
+});
+
 test("design brief stays inside its character budget", () => {
   const long = SAMPLE_HTML.replace(
     "</main>",
