@@ -12,6 +12,7 @@ export default function Home() {
             width={180}
             height={107}
             priority
+            className="[mask-image:linear-gradient(to_bottom,black_28%,transparent_88%)] [-webkit-mask-image:linear-gradient(to_bottom,black_28%,transparent_88%)]"
           />
         </h1>
       </header>

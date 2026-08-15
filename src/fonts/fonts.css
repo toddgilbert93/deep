@@ -1,14 +1,7 @@
 /*
- * Desperado type: Quantico for body, Doto for accent.
+ * Deep UI type: Quantico only (400 regular, 700 bold). SIL Open Font License.
  *
- * Quantico is the tattoo-lettering face (400 regular, 700 bold). Doto is the
- * shared accent face — short shouted type, labels, the same one the bitmap
- * board package uses. Both are SIL Open Font License.
- *
- * Import this file once at the app root. It publishes --font-quantico and
- * --font-doto; themes/desperado.css reads those to set --font-body / --font-accent.
- *
- * Adjust the url() paths if you move the .ttf files.
+ * Import once at the app root. Publishes --font-quantico for the theme.
  */
 
 @font-face {
@@ -27,15 +20,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Doto";
-  src: url("./Doto.ttf") format("truetype");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --font-quantico: "Quantico";
-  --font-doto: "Doto";
 }

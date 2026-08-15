@@ -1,12 +1,9 @@
 /*
- * Desperado — tattoo lettering over tobacco near-black. Electric-blue accent,
- * square corners, no shadow. The blue keyline is the only separation from
- * whatever sits behind the card.
+ * Deep chrome — Quantico on near-black, electric-blue accents only.
+ * Square corners, no shadow. The blue keyline is the only edge.
  *
- * SELECTOR: `data-theme="desperado"` (same as the source app) and the class
- * `.desperado-theme` so you can apply it without fighting an existing
- * data-theme. Import fonts/fonts.css first — this file reads --font-quantico
- * and --font-doto from there.
+ * SELECTOR: `data-theme="desperado"` and `.desperado-theme`.
+ * Import fonts/fonts.css first so --font-quantico is defined.
  */
 
 [data-theme="desperado"],
@@ -15,6 +12,7 @@
   --foreground: #e8dcc8;
   --muted: #8eb8d0;
   --accent: #00a8ff;
+  --accent-light: #b3e5ff;
   --accent-soft: #0a1218;
   --surface: #0a0604;
   --ring: #00a8ff;
@@ -31,7 +29,7 @@
   --error: #ff5040;
 
   --font-body: var(--font-quantico), "Arial Narrow", Helvetica, sans-serif;
-  --font-accent: var(--font-doto), ui-monospace, monospace;
+  --font-accent: var(--font-body);
 
   /* Electric ramp: charred black → deep blue → voltage → ice. */
   --fluid-c0: #020308;
@@ -67,7 +65,7 @@
 
 .desperado-accent {
   font-family: var(--font-accent);
-  font-variation-settings: "wght" 700;
+  font-weight: 700;
 }
 
 .desperado-card {

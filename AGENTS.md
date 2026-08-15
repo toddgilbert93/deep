@@ -128,8 +128,8 @@ injectable event-source adapter, not invoke the backend CLI from the browser.
 ## Repository map
 
 - `src/app/` — Next.js frontend application.
-- `src/themes/` — Desperado colour and type tokens.
-- `src/fonts/` — Quantico and Doto faces for the Desperado theme.
+- `src/themes/` — Deep colour tokens: near-black surface, electric-blue accents.
+- `src/fonts/` — Quantico, the only UI face.
 - `public/` — frontend static assets.
 - `src/app/3DUI/_lib/` — approved 3D primitives that generated pages must use.
   Read `src/app/3DUI/instructions.md` before changing or using the library.

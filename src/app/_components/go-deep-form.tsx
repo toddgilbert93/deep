@@ -50,7 +50,7 @@ export function GoDeepForm() {
     >
       <div className="flex w-full flex-col gap-3">
         <label htmlFor="page-url">
-          <TextShadow3D fontFamily="var(--font-accent)" ink="var(--ink)">
+          <TextShadow3D fontFamily="var(--font-body)" ink="var(--fluid-c3)">
             Add URL
           </TextShadow3D>
         </label>
@@ -83,6 +83,8 @@ export function GoDeepForm() {
         type="submit"
         width={200}
         disabled={!url.trim()}
+        face="var(--accent)"
+        ink="var(--ink-contrast)"
         fontFamily="var(--font-body)"
       >
         Go Deep
