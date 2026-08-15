@@ -1,0 +1,96 @@
+/*
+ * Desperado — tattoo lettering over tobacco near-black. Electric-blue accent,
+ * square corners, no shadow. The blue keyline is the only separation from
+ * whatever sits behind the card.
+ *
+ * SELECTOR: `data-theme="desperado"` (same as the source app) and the class
+ * `.desperado-theme` so you can apply it without fighting an existing
+ * data-theme. Import fonts/fonts.css first — this file reads --font-quantico
+ * and --font-doto from there.
+ */
+
+[data-theme="desperado"],
+.desperado-theme {
+  --background: #0a0604;
+  --foreground: #e8dcc8;
+  --muted: #8eb8d0;
+  --accent: #00a8ff;
+  --accent-soft: #0a1218;
+  --surface: #0a0604;
+  --ring: #00a8ff;
+
+  --card: #0a0604;
+  --card-shadow: none;
+  --card-shadow-drag: none;
+  --card-border: 1px solid #00a8ff;
+
+  --lede: #8eb8d0;
+  --ink: #e8dcc8;
+  --ink-contrast: #0a0604;
+  --field-line: #00a8ff;
+  --error: #ff5040;
+
+  --font-body: var(--font-quantico), "Arial Narrow", Helvetica, sans-serif;
+  --font-accent: var(--font-doto), ui-monospace, monospace;
+
+  /* Electric ramp: charred black → deep blue → voltage → ice. */
+  --fluid-c0: #020308;
+  --fluid-c1: #053a80;
+  --fluid-c2: #0088e8;
+  --fluid-c3: #40c8ff;
+
+  --veil: radial-gradient(
+    ellipse at center,
+    rgb(16 10 7 / 97%) 0%,
+    rgb(7 4 3 / 100%) 100%
+  );
+
+  /* Flat printed stock — keyline meets at right angles. */
+  --radius: 0;
+
+  color-scheme: dark;
+}
+
+/*
+ * Optional page/surface helpers. Tokens above work without these; they just
+ * save you wiring background, type, and the square corner yourself.
+ */
+.desperado-theme {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+.desperado-body {
+  font-family: var(--font-body);
+}
+
+.desperado-accent {
+  font-family: var(--font-accent);
+  font-variation-settings: "wght" 700;
+}
+
+.desperado-card {
+  background: var(--card);
+  color: var(--foreground);
+  border: var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+}
+
+.desperado-field {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--field-line);
+  border-radius: var(--radius);
+}
+
+.desperado-field::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.desperado-field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
